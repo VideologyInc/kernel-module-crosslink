@@ -58,8 +58,8 @@ struct crosslink_dev {
 
 enum crosslink_regs {
 	CROSSLINK_REG_ID = 0x1,         // RO: 8:  Firmware version
-	CROSSLINK_REG_ENABLE = 0x2,     // RW: 8:  bit[0]: mipi-en, bit[1]: lvds-en, bit[2]: uart-en
-	CROSSLINK_REG_MODE = 0x3,		// RW: 8:  mode, "reg_val" in struct resolution
+	CROSSLINK_REG_ENABLE = 0x2,     // RW: 8:  [b3]=CAM-POW-EN	[b2]=UART-EN	[b1]=LVDS-EN	[b0]=MIPI-EN
+	CROSSLINK_REG_MODE = 0x3,		// RW: 8:  mode. No longer used.
 	CROSSLINK_REG_LINE_COUNT = 0x4, // RO:16:  Y-count
 	CROSSLINK_REG_COLM_COUNT = 0x6, // RO:16:  X-count
 	CROSSLINK_REG_STATUS = 0x8, 	// RO: 8:  000 & pll_lock & gddr_rdy & bit_lock & word_lock & bw_rdy
