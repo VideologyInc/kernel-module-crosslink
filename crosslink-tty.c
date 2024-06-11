@@ -1,6 +1,12 @@
 // SPDX-License-Identifier: GPL-2.0
 /*
- * Copyright 2019 NXP
+ * Copyright 2023 Videology Inc.
+ *
+ * TTY interface to the I2C <-> serial converter. 
+ * NOTE: the current implementation uses polling to check for data whenever the TTY fd is open. 
+ *     This is undesirable, so we might want to change to actively checking how many bytes 
+ *     are avaibale only when the user tries, or only poll during a timed 'read' oeration. 
+ *
  */
 
 #include <linux/slab.h>
