@@ -26,6 +26,8 @@
 #include <media/v4l2-event.h>
 #include <media/v4l2-fwnode.h>
 #include <media/v4l2-subdev.h>
+#include <linux/version.h>
+
 #include "crosslink.h"
 
 static bool __read_mostly powerdown_enable = 0;
@@ -465,7 +467,11 @@ static struct regmap_config sensor_regmap_config = {
 	.unlock = crosslink_unlock_mutex,
 };
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 3, 0)
 static int crosslink_probe(struct i2c_client *client)
+#else
+static int crosslink_probe(struct i2c_client *client, const struct i2c_device_id *id)
+#endif
 {
 	struct device *dev = &client->dev;
 	struct fwnode_handle *endpoint;
@@ -606,7 +612,11 @@ entity_cleanup:
 	return ret;
 }
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(6, 0, 0)
+static int crosslink_remove(struct i2c_client *client)
+#else
 static void crosslink_remove(struct i2c_client *client)
+#endif
 {
 	struct v4l2_subdev *sd = i2c_get_clientdata(client);
 	struct crosslink_dev *sensor = to_crosslink_dev(sd);
@@ -632,6 +642,9 @@ static void crosslink_remove(struct i2c_client *client)
 	media_entity_cleanup(&sensor->sd.entity);
 
 	mutex_destroy(&sensor->lock);
+#if LINUX_VERSION_CODE < KERNEL_VERSION(6, 0, 0)
+	return 0;
+#endif
 }
 
 static const struct dev_pm_ops crosslink_pm_ops = {
@@ -657,7 +670,7 @@ static struct i2c_driver crosslink_i2c_driver = {
 		.pm = &crosslink_pm_ops,
 	},
 	.id_table = crosslink_id,
-	.probe_new = crosslink_probe,
+	.probe = crosslink_probe,
 	.remove   = crosslink_remove,
 };
 

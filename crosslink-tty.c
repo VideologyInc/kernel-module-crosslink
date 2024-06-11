@@ -2,10 +2,10 @@
 /*
  * Copyright 2023 Videology Inc.
  *
- * TTY interface to the I2C <-> serial converter. 
- * NOTE: the current implementation uses polling to check for data whenever the TTY fd is open. 
- *     This is undesirable, so we might want to change to actively checking how many bytes 
- *     are avaibale only when the user tries, or only poll during a timed 'read' oeration. 
+ * TTY interface to the I2C <-> serial converter.
+ * NOTE: the current implementation uses polling to check for data whenever the TTY fd is open.
+ *     This is undesirable, so we might want to change to actively checking how many bytes
+ *     are avaibale only when the user tries, or only poll during a timed 'read' oeration.
  *
  */
 
@@ -19,6 +19,8 @@
 #include <linux/tty_flip.h>
 #include <linux/virtio.h>
 #include <linux/workqueue.h>
+#include <linux/version.h>
+
 #include "crosslink.h"
 
 static struct tty_driver *crosslink_tty_driver = NULL;
@@ -100,7 +102,12 @@ static void crosslink_tty_close(struct tty_struct *tty, struct file *filp){
 	return tty_port_close(tty->port, tty, filp);
 }
 
-static int crosslink_tty_write(struct tty_struct *tty, const unsigned char *buf, int total){
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 3, 0)
+static ssize_t crosslink_tty_write(struct tty_struct *tty, const u8 *buf, size_t count)
+#else
+static int crosslink_tty_write(struct tty_struct *tty, const unsigned char *buf, int count)
+#endif
+{
 	struct crosslink_dev *sensor = container_of(tty->port, struct crosslink_dev, port);
 	int ret;
 
@@ -109,12 +116,12 @@ static int crosslink_tty_write(struct tty_struct *tty, const unsigned char *buf,
 		return -ENOMEM;
 	}
 
-	dev_dbg_ratelimited(sensor->dev, "%s: CROSSLINK_CMD_SERIAL_TX %d \n", __func__, total);
-	ret = regmap_bulk_write(sensor->regmap, CROSSLINK_REG_SERIAL, buf, total);
+	dev_dbg_ratelimited(sensor->dev, "%s: CROSSLINK_CMD_SERIAL_TX %d \n", __func__, count);
+	ret = regmap_bulk_write(sensor->regmap, CROSSLINK_REG_SERIAL, buf, count);
 	if (ret)
 		return 0;
 	else
-		return total;
+		return count;
 }
 
 static unsigned int crosslink_tty_write_room(struct tty_struct *tty){
