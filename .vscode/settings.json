@@ -4,6 +4,10 @@
         "*defconfig": "Makefile",
         "sw-description": "libconfig",
         "defconfig": "makefile",
-        "version.h": "c"
+        "version.h": "c",
+        "i2c.h": "c",
+        "consumer.h": "c",
+        "crosslink.h": "c",
+        "module.h": "c"
     }
 }

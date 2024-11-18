@@ -26,26 +26,6 @@
 static struct tty_driver *crosslink_tty_driver = NULL;
 static struct tty_port_operations  crosslink_tty_port_ops = { };
 
-static void crosslink_tty_handler_old(struct work_struct *work) {
-	struct crosslink_dev *sensor = container_of(to_delayed_work(work), struct crosslink_dev, tty_work);
-	int ret, xferd;
-	uint rx_waiting = 0;
-	unsigned char cbuf[64];
-
-	ret  = regmap_read(sensor->regmap, CROSSLINK_REG_UART_RX_CNT, &rx_waiting);
-	if (ret==0 && rx_waiting > 0) {
-		ret = regmap_bulk_read(sensor->regmap, CROSSLINK_REG_SERIAL, cbuf, rx_waiting);
-		dev_dbg_ratelimited(sensor->dev, "%s: TTY got %d bytes\n", __func__, rx_waiting);
-		xferd = tty_insert_flip_string(&sensor->port, cbuf, rx_waiting);
-		if (xferd)
-			tty_flip_buffer_push(&sensor->port);
-		usleep_range(1000, 2000);
-		schedule_delayed_work(&sensor->tty_work, 0);
-	} else {
-		schedule_delayed_work(&sensor->tty_work, HZ/50);
-	}
-}
-
 static int baud_sleep_us(struct tty_port *port){
 	int baud=0;
 	struct tty_struct *tty;
@@ -116,7 +96,7 @@ static int crosslink_tty_write(struct tty_struct *tty, const unsigned char *buf,
 		return -ENOMEM;
 	}
 
-	dev_dbg_ratelimited(sensor->dev, "%s: CROSSLINK_CMD_SERIAL_TX %d \n", __func__, count);
+	dev_dbg_ratelimited(sensor->dev, "%s: CROSSLINK_CMD_SERIAL_TX %ld \n", __func__, count);
 	ret = regmap_bulk_write(sensor->regmap, CROSSLINK_REG_SERIAL, buf, count);
 	if (ret)
 		return 0;
@@ -166,16 +146,15 @@ static const struct tty_operations crosslink_tty_ops = {
 int crosslink_tty_probe(struct crosslink_dev *sensor)
 {
 	int ret;
-	struct device *dev;
 
 	dev_dbg(sensor->dev, "%s: start \n", __func__);
 	tty_port_init(&sensor->port);
 	sensor->port.ops = &crosslink_tty_port_ops;
 	sensor->tty_port_dev = tty_port_register_device(&sensor->port, crosslink_tty_driver, sensor->csi_id, NULL);
-	if (IS_ERR(dev)) {
+	if (IS_ERR(sensor->tty_port_dev)) {
 		tty_port_tty_hangup(&sensor->port, false);
 		// tty_port_destroy(&sensor->port);
-		ret = PTR_ERR(dev);
+		ret = PTR_ERR(sensor->tty_port_dev);
 	}
 	return ret;
 }

@@ -1,22 +1,16 @@
 {
-    "env": {
-        "kernel_artifacts": "${workspaceFolder}/../../../tmp/work-shared/scailx-imx8mp/kernel-build-artifacts/",
-        "kernel_path": "${workspaceFolder}/../../../tmp/work-shared/scailx-imx8mp/kernel-build-artifacts/"
-    },
     "configurations": [
         {
-            "name": "kernel-module-devtool",
+            "name": "Linux",
             "includePath": [
-                "${kernel_artifacts}/arch/arm64/include/**",
-                "${kernel_artifacts}/arch/arm64/include/generated/**",
-                "${kernel_path}/include/**",
-                "${kernel_path}/arch/arm64/include/**",
-                "${workspaceFolder}/oe-workdir/recipe-sysroot/usr/include/**"
+                "${workspaceFolder}/**",
+                "/lib/modules/6.6.23-lts-next/build/include/**",
+                "/lib/modules/6.6.23-lts-next/build/arch/arm64/include/**"
             ],
-            "defines": [ "_LINUX", "__KERNEL__" ],
-            "forcedInclude": ["${kernel_artifacts}/include/generated/autoconf.h"],
-            "compilerPath": "${workspaceFolder}/oe-workdir/recipe-sysroot-native/usr/bin/aarch64-poky-linux/aarch64-poky-linux-g++",
-            "cppStandard": "c++11",
+            "defines": [],
+            "compilerPath": "/usr/bin/gcc",
+            "cStandard": "c17",
+            "cppStandard": "gnu++17",
             "intelliSenseMode": "linux-gcc-arm64"
         }
     ],
