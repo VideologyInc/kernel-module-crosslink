@@ -18,10 +18,6 @@
 #include <linux/slab.h>
 #include "crosslink.h"
 
-#define CROSSLINKPLUS_IDCODE	0x43002F01
-#define CROSSLINK_IDCODE		0x43002C01
-#define CROSSLINK_RESET_RETRY_CNT	2
-
 u8 isc_enable[]          = {0xC6, 0x00, 0x00, 0x00};
 u8 isc_erase[]           = {0x0E, 0x00, 0x00, 0x00};
 u8 isc_disable[]         = {0x26, 0x00, 0x00, 0x00};
@@ -38,9 +34,9 @@ u8 lsc_check_busy[]      = {0xF0, 0x00, 0x00, 0x00};
 
 u8 activation_msg[] = {0xA4, 0xC6, 0xF4, 0x8A};
 
-#define STATUS_DONE	BIT(16)
-#define STATUS_BUSY	BIT(20)
-#define STATUS_FAIL	BIT(21)
+#define STATUS_DONE	BIT(8)
+#define STATUS_BUSY	BIT(12)
+#define STATUS_FAIL	BIT(13)
 
 #define prog_addr 0x40
 
@@ -64,59 +60,69 @@ static int lsc_xfer(struct i2c_client *client, u8 *write_buf, size_t write_len, 
     return ret;
 }
 
-static int crosslink_fpga_reset(struct gpio_desc *reset, struct i2c_client *client)
-{
-	u32 idcode;
-	int ret;
+static u32 lsc_status(struct i2c_client *client) {
+	int ret=0;
+	u32 status=0;
+	ret = lsc_xfer(client, lsc_read_status, ARRAY_SIZE(lsc_read_status), (u8 *) &status, sizeof(status));
+	if (ret < 0) {
+		dev_err(&client->dev, "LSC_READ_STATUS command failed! (%d)\n", ret);
+		return 0xffff;
+	}
+	status = __be32_to_cpu(status);
 
+	dev_dbg(&client->dev, "STATUS: 0x%x\n (done: %s busy: %s, fail: %s)", status,
+			status & STATUS_DONE ? "yes" : "no",
+			status & STATUS_BUSY ? "yes" : "no",
+			status & STATUS_FAIL ? "yes" : "no");
+
+	if (status & STATUS_BUSY) {
+		dev_dbg(&client->dev, "stat busy\n");
+	}
+
+	return status;
+}
+
+u32 crosslink_fpga_reset(struct gpio_desc *reset, struct i2c_client *client)
+{
+	u32 idcode=0;
+	int ret;
+	dev_dbg(&client->dev, "START RESET\n");
+
+	gpiod_set_value_cansleep(reset, 0);
+	mdelay(2);
+	dev_dbg(&client->dev, "DELAY 10\n");
 	gpiod_set_value_cansleep(reset, 1);
-	mdelay(1);
+	mdelay(5);
+	dev_dbg(&client->dev, "rESET, DELAY 1000\n");
 
 	ret = lsc_xfer(client, activation_msg, ARRAY_SIZE(activation_msg), NULL, 0);
 	if (ret < 0) {
 		dev_err(&client->dev, "Writing activation code failed! (%d)\n", ret);
-		return ret;
+		return (u32)ret;
 	}
 
 	gpiod_set_value_cansleep(reset, 0);
 
 	mdelay(1);
 
-	ret = lsc_xfer(client, isc_enable, ARRAY_SIZE(isc_enable), NULL, 0);
-	if (ret < 0) {
-		dev_err(&client->dev, "ISC_ENABLE command failed! (%d)\n", ret);
-		return ret;
-	}
-
 	ret = lsc_xfer(client, idcode_pub, ARRAY_SIZE(idcode_pub), (u8 *) &idcode, sizeof(idcode));
+	dev_dbg(&client->dev, "READ ID CODE\n");
 	if (ret < 0) {
 		dev_err(&client->dev, "IDCODE command failed! (%d)\n", ret);
-		return ret;
+		return (u32)ret;
 	}
 
 	dev_dbg(&client->dev, "IDCODE: 0x%x\n", idcode);
 
-	if (idcode != CROSSLINK_IDCODE && idcode != CROSSLINKPLUS_IDCODE)
-		return -ENODEV;
-
-	return 0;
+	return idcode;
 }
 
 int crosslink_fpga_ops_write_init(struct gpio_desc *reset, struct i2c_client *client)
 {
-	int ret, i;
+	int ret;
+	u32 stat;
 
-	for (i = 0; i < CROSSLINK_RESET_RETRY_CNT; i++) {
-		ret = crosslink_fpga_reset(reset, client);
-		if (ret == 0)
-			break;
-	}
-
-	if (ret) {
-		dev_err(&client->dev, "FPGA reset failed! (%d)\n", ret);
-		return ret;
-	}
-
+	dev_dbg(&client->dev, "ISC ENABLE\n");
 	ret = lsc_xfer(client, isc_enable, ARRAY_SIZE(isc_enable), NULL, 0);
 	if (ret < 0) {
 		dev_err(&client->dev, "ISC_ENABLE command failed! (%d)\n", ret);
@@ -125,13 +131,19 @@ int crosslink_fpga_ops_write_init(struct gpio_desc *reset, struct i2c_client *cl
 
 	mdelay(1);
 
+	dev_dbg(&client->dev, "ERASE\n");
 	ret = lsc_xfer(client, isc_erase, ARRAY_SIZE(isc_erase), NULL, 0);
 	if (ret < 0) {
 		dev_err(&client->dev, "ISC_ERASE command failed! (%d)\n", ret);
 		return ret;
 	}
 
-	mdelay(50);
+	mdelay(25);
+	stat = lsc_status(client);
+	if ((stat & 0x3000) != 0){
+		dev_err(&client->dev, "status after erase is invalid: (%x)\n", stat);
+		return -EINVAL;
+	}
 
 	return 0;
 }
@@ -146,7 +158,6 @@ int crosslink_fpga_ops_write(struct i2c_client *client, const char *buf, size_t 
 	u32 status;
 	int ret, i;
 
-	msgbuf = kzalloc(count + 4, GFP_KERNEL);
 	if (!msgbuf)
 		return -ENOMEM;
 
@@ -154,13 +165,12 @@ int crosslink_fpga_ops_write(struct i2c_client *client, const char *buf, size_t 
 	if (!bitstream_msg)
 		return -ENOMEM;
 
+	dev_dbg(&client->dev, "LSC-INIT\n");
 	ret = lsc_xfer(client, lsc_init, ARRAY_SIZE(lsc_init), NULL, 0);
 	if (ret < 0) {
 		dev_err(&client->dev, "LSC_INIT command failed! (%d)\n", ret);
 		return ret;
 	}
-
-	mdelay(100);
 
 	memcpy(msgbuf, lsc_bitstream_burst, 4);
 	memcpy(msgbuf + 4, buf, count);
@@ -170,35 +180,25 @@ int crosslink_fpga_ops_write(struct i2c_client *client, const char *buf, size_t 
 		bitstream_msg[i].buf  = msgbuf + (i * maxlen);
 		bitstream_msg[i].len  = msglen > maxlen ? maxlen : msglen;
 		if (i > 0)
-			bitstream_msg[i].flags = I2C_M_NOSTART;
+			bitstream_msg[i].flags |= I2C_M_NOSTART;
 
 		msglen -= maxlen;
 	}
-
+	dev_dbg(&client->dev, "SENDING %d PACKETS\n", msgnum);
 	ret = i2c_transfer(client->adapter, bitstream_msg, msgnum);
 	if (ret < 0) {
 		dev_err(&client->dev, "BITSTREAM_BURST command failed! (%d).\n", ret);
-		// return ret;
+		return ret;
 	}
 
 	kfree(msgbuf);
 	kfree(bitstream_msg);
 
-	ret = lsc_xfer(client, lsc_read_status, ARRAY_SIZE(lsc_read_status), (u8 *) &status, sizeof(status));
-	if (ret < 0) {
-		dev_err(&client->dev, "LSC_READ_STATUS command failed! (%d)\n", ret);
-		return ret;
-	}
-
-
-	dev_dbg(&client->dev, "STATUS: 0x%x\n (done: %s busy: %s, fail: %s)", status,
-			status & STATUS_DONE ? "yes" : "no",
-			status & STATUS_BUSY ? "yes" : "no",
-			status & STATUS_FAIL ? "yes" : "no");
-
-	if (!(status & STATUS_DONE)) {
-		dev_err(&client->dev, "Bitstream loading failed!\n");
-		return -EIO;
+	mdelay(5);
+	status = lsc_status(client);
+	if ((status & 0x3100) != 0x100) {
+		dev_err(&client->dev, "Status following Bitstream-prog is invalid: 0x%x\n", status);
+	 	return -EIO;
 	}
 
 	return 0;

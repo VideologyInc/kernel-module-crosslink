@@ -153,7 +153,6 @@ static int crosslink_ops_get_fmt(struct v4l2_subdev *sub_dev, struct v4l2_subdev
 static int crosslink_set_fmt(struct v4l2_subdev *sd, struct v4l2_subdev_state *sd_state, struct v4l2_subdev_format *format)
 {
 	struct crosslink_dev *sensor = to_crosslink_dev(sd);
-	struct v4l2_mbus_framefmt *fmt;
 	u32 status;
 	int ret=0;
 
@@ -316,7 +315,7 @@ static int crosslink_s_stream(struct v4l2_subdev *sd, int enable)
 		ret |= regmap_write(sensor->regmap, 0x2, 0xFE);
 		INIT_DELAYED_WORK(&sensor->mipi_work, crosslink_mipi_handler);
 		schedule_delayed_work(&sensor->mipi_work, HZ/15);  // at least one frame delay. lowest framerate is 25 Hz
-		pr_debug("%s: Starting stream at WxH@fps=%dx%d@%d\n", __func__, 12, 13, 14);
+		pr_debug("%s: Starting stream\n", __func__);
 	} else {
 		ret |= regmap_write(sensor->regmap, 0x2, 0xFE);
 		sensor->state = CRSLK_STATE_IDLE;
@@ -478,6 +477,7 @@ static int crosslink_probe(struct i2c_client *client, const struct i2c_device_id
 	struct crosslink_dev *sensor;
 	struct v4l2_mbus_framefmt *fmt;
 	int ret;
+	u32 idcode = 0;
 
 	pr_debug("-->%s crosslink Probe start\n",__func__);
 
@@ -546,8 +546,19 @@ static int crosslink_probe(struct i2c_client *client, const struct i2c_device_id
 	}
 
 	mutex_lock(&sensor->lock);
+	idcode = crosslink_fpga_reset(sensor->reset_gpio, sensor->i2c_client);
+	if (idcode == CROSSLINK_IDCODE) {
+		ret = request_firmware_nowait(THIS_MODULE, FW_ACTION_UEVENT, FIRWARE_NAME_MD6000,  dev, GFP_KERNEL, sensor, crosslink_fw_handler);
+		dev_dbg(dev, "requesting firmware %s", FIRWARE_NAME_MD6000);
+	} else if (idcode == CROSSLINKPLUS_IDCODE) {
+		ret = request_firmware_nowait(THIS_MODULE, FW_ACTION_UEVENT, FIRWARE_NAME_MDF6000, dev, GFP_KERNEL, sensor, crosslink_fw_handler);
+		dev_dbg(dev, "requesting firmware %s", FIRWARE_NAME_MDF6000);
+	} else {
+		dev_err(dev, "unexpected IDCODE value: 0x%x\n", idcode);
+		return -EINVAL;
+	}
+
 	dev_info(dev, "Loading Firmware: %02x\n", FIRMWARE_VERSION);
-	ret = request_firmware_nowait(THIS_MODULE, FW_ACTION_UEVENT, FIRWARE_NAME, dev, GFP_KERNEL, sensor, crosslink_fw_handler);
 	if (ret) {
 		dev_err(dev, "Failed request_firmware_nowait err %d\n", ret);
 		goto entity_cleanup;
@@ -565,9 +576,6 @@ static int crosslink_probe(struct i2c_client *client, const struct i2c_device_id
 	if (ret)
 		goto entity_cleanup;
 
-	// turn off
-	dev_dbg(sensor->dev, "setting reset pin off\n");
-	gpiod_set_value_cansleep(sensor->reset_gpio, 1);
 /*
 	 * We need the driver to work in the event that pm runtime is disable in
 	 * the kernel, so power up and verify the chip now. In the event that

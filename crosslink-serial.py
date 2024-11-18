@@ -70,6 +70,7 @@ def wait_for_rx_stable(dev_path, start_wait_ms, stop_wait_ms):
     while get_rx_count(dev_path) == 0:
         sleep(0.002)
         if time_ns() - start > start_wait_ms*1e6:
+            print("rx start timeout")
             return False
     byte_count = get_rx_count(dev_path)
     start = time_ns()
@@ -89,7 +90,9 @@ def main():
     parser.add_argument('data', type=str, help='data to send, as hex string')
     args = parser.parse_args()
     data = bytearray.fromhex(args.data)
-    recv(args.dev)        # clear RX fifo
+    test = recv(args.dev)        # clear RX fifo
+    if test:
+        print(test)
     send(args.dev, data)
     wait_for_rx_stable(args.dev, args.timeout, args.timeout/4)
     count = get_rx_count(args.dev)
