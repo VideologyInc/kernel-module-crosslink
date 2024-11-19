@@ -71,6 +71,10 @@ static long crosslink_ioctl(struct v4l2_subdev *sd, unsigned int cmd, void *arg)
 	struct crosslink_dev *sensor = to_crosslink_dev(sd);
 	struct crosslink_ioctl_serial *serial;
 
+	if (sensor->firmware_loaded == 0)
+		return -ENODEV
+
+	pm_runtime_get_sync(sensor->dev);
 	switch (cmd) {
 		case CROSSLINK_CMD_SERIAL_SEND_TX:
 			dev_dbg_ratelimited(sensor->dev, "%s: CROSSLINK_CMD_SERIAL_TX\n", __func__);
@@ -100,9 +104,54 @@ static long crosslink_ioctl(struct v4l2_subdev *sd, unsigned int cmd, void *arg)
 				serial->len = DIV_ROUND_CLOSEST(24000000, baud);
 			}
 			break;
+		case CROSSLINK_CMD_GET_FW_VERSION:
+			dev_dbg_ratelimited(sensor->dev, "%s: CROSSLINK_CMD_GET_FW_VERSION\n", __func__);
+			serial = (struct crosslink_ioctl_serial *)arg;
+			ret = regmap_read(sensor->regmap, CROSSLINK_REG_ID, &serial->len);
+			break;
+		case CROSSLINK_CMD_GET_LVDS_STATUS:
+			dev_dbg_ratelimited(sensor->dev, "%s: CROSSLINK_CMD_GET_LVDS_STATUS\n", __func__);
+			serial = (struct crosslink_ioctl_serial *)arg;
+			ret = regmap_read(sensor->regmap, CROSSLINK_REG_LVDS_STATUS, &serial->len);
+			break;
+		case CROSSLINK_CMD_GET_UART_STATUS:
+			dev_dbg_ratelimited(sensor->dev, "%s: CROSSLINK_CMD_GET_UART_STATUS\n", __func__);
+			serial = (struct crosslink_ioctl_serial *)arg;
+			ret = regmap_read(sensor->regmap, CROSSLINK_REG_UART_STAT, &serial->len);
+			break;
+		case CROSSLINK_CMD_GET_FRAME_PERIOD:
+			dev_dbg_ratelimited(sensor->dev, "%s: CROSSLINK_CMD_GET_FRAME_PERIOD\n", __func__);
+			serial = (struct crosslink_ioctl_serial *)arg;
+			ret = regmap_raw_read(sensor->regmap, CROSSLINK_REG_FRAME_PERIOD, &serial->len, 2);
+			break;
+		case CROSSLINK_CMD_GET_PIXEL_FREQ:
+			dev_dbg_ratelimited(sensor->dev, "%s: CROSSLINK_CMD_GET_PIXEL_FREQ\n", __func__);
+			serial = (struct crosslink_ioctl_serial *)arg;
+			ret = regmap_read(sensor->regmap, CROSSLINK_REG_PX_MHZ, &serial->len);
+			break;
+		case CROSSLINK_CMD_GET_LINE_COUNT:
+			dev_dbg_ratelimited(sensor->dev, "%s: CROSSLINK_CMD_GET_LINE_COUNT\n", __func__);
+			serial = (struct crosslink_ioctl_serial *)arg;
+			ret = regmap_raw_read(sensor->regmap, CROSSLINK_REG_LINE_COUNT, &serial->len, 2);
+			break;
+		case CROSSLINK_CMD_GET_COLM_COUNT:
+			dev_dbg_ratelimited(sensor->dev, "%s: CROSSLINK_CMD_GET_COLM_COUNT\n", __func__);
+			serial = (struct crosslink_ioctl_serial *)arg;
+			ret = regmap_raw_read(sensor->regmap, CROSSLINK_REG_COLM_COUNT, &serial->len, 2);
+			break;
+		case CROSSLINK_CMD_SET_POWERDOWN:
+			dev_dbg_ratelimited(sensor->dev, "%s: CROSSLINK_CMD_SET_POWERDOWN\n", __func__);
+			sensor->enable_powerdown = 1;
+			break;
+		case CROSSLINK_CMD_FORCE_HVSYNC_INV:
+			dev_dbg_ratelimited(sensor->dev, "%s: CROSSLINK_CMD_FORCE_HVSYNC_INV\n", __func__);
+			serial = (struct crosslink_ioctl_serial *)arg;
+			ret = regmap_write(sensor->regmap, CROSSLINK_REG_LVDS_INV, serial->len);
+			break;
 		default:
 			ret = -EINVAL;
 	}
+	pm_runtime_put_autosuspend(sensor->dev);
 
 	return 0;
 }
@@ -411,7 +460,7 @@ static int __maybe_unused crosslink_suspend(struct device *dev)
 	struct crosslink_dev *sensor = to_crosslink_dev(sd);
 	dev_dbg(dev, "%s: \n", __func__);
 
-	if (powerdown_enable)
+	if (sensor->enable_powerdown)
 		ret = regmap_write(sensor->regmap, CROSSLINK_REG_ENABLE, 0x07);
 	else
 		ret = regmap_write(sensor->regmap, CROSSLINK_REG_ENABLE, 0xFE);
@@ -489,6 +538,7 @@ static int crosslink_probe(struct i2c_client *client, const struct i2c_device_id
 	sensor->i2c_client = client;
 	sensor->current_res_fr.height = 0;
 	sensor->current_res_fr.width = 0;
+	sensor->enable_powerdown = (int)powerdown_enable;
 
 	// default init sequence initialize sensor to 1080p30 YUV422 UYVY
 	fmt = &sensor->fmt;

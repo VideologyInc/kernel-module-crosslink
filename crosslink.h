@@ -57,6 +57,7 @@ struct crosslink_dev {
 	struct delayed_work mipi_work;
 	char of_name[32];
 	int framerate;
+	int enable_powerdown;
 	int csi_id;
 	int has_serial;
 	int state;
@@ -66,10 +67,10 @@ struct crosslink_dev {
 enum crosslink_regs {
 	CROSSLINK_REG_ID = 0x1,         // RO: 8:  Firmware version
 	CROSSLINK_REG_ENABLE = 0x2,     // RW: 8:  [b3]=CAM-POW-EN	[b2]=UART-EN	[b1]=LVDS-EN	[b0]=MIPI-EN
-	CROSSLINK_REG_MODE = 0x3,		// RW: 8:  lvds hsync vsync invert. [1]=force-invert [0]=force-non-invert
+	CROSSLINK_REG_LVDS_INV = 0x3,	// RW: 8:  lvds hsync vsync invert. [1]=force-invert [0]=force-non-invert
 	CROSSLINK_REG_LINE_COUNT = 0x4, // RO:16:  Y-count
 	CROSSLINK_REG_COLM_COUNT = 0x6, // RO:16:  X-count
-	CROSSLINK_REG_STATUS = 0x8, 	// RO: 8:  embedded_hv_valid & hv_sync_inverted & is_8ch_not_4ch & pll_lock_int & gddr_rdy_int & bit_lock_int & word_lock_int & bw_rdy_int;
+	CROSSLINK_REG_LVDS_STATUS = 0x8,// RO: 8:  embedded_hv_valid & hv_sync_inverted & is_8ch_not_4ch & pll_lock_int & gddr_rdy_int & bit_lock_int & word_lock_int & bw_rdy_int;
 	CROSSLINK_REG_UART_STAT = 0x9,  // RO: 8:  board_detect2 & board_detect1 & s_busy_tx & s_busy_rx & s_data_fulltx & s_data_emptytx & s_data_fullrx & s_data_emptyrx;
 	CROSSLINK_REG_UART_RX_CNT= 0xA, // RO: 8:  count of bytes in UART RX fifo
 	CROSSLINK_REG_UART_PRESCL= 0xC, // RW:16:  UART Prescaler from 24 MHz. default=2500 => 24M/2500=9600 baud.
@@ -97,6 +98,15 @@ enum crosslink_ioctl_cmds {
 	CROSSLINK_CMD_SERIAL_RECV_RX	= 0x7602,
 	CROSSLINK_CMD_SERIAL_RX_CNT		= 0x7603,
 	CROSSLINK_CMD_SERIAL_BAUD 		= 0x7604,
+	CROSSLINK_CMD_GET_FW_VERSION	= 0x7605,
+	CROSSLINK_CMD_GET_LVDS_STATUS	= 0x7606,
+	CROSSLINK_CMD_GET_UART_STATUS	= 0x7607,
+	CROSSLINK_CMD_GET_FRAME_PERIOD	= 0x7608,
+	CROSSLINK_CMD_GET_PIXEL_FREQ	= 0x7609,
+	CROSSLINK_CMD_GET_LINE_COUNT	= 0x760A,
+	CROSSLINK_CMD_GET_COLM_COUNT	= 0x760B,
+	CROSSLINK_CMD_SET_POWERDOWN		= 0x760C,
+	CROSSLINK_CMD_FORCE_HVSYNC_INV	= 0x760D,
 };
 
 /* function protoypes */
