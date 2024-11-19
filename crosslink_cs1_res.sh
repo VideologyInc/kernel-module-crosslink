@@ -14,7 +14,7 @@ function write_check() {
     echo "Writing $1"
     for _ in {0..20}; do
         if [[ -n "${has_i2c_serial}" ]]; then
-            res=$(vdlg-lvds-setres -d /dev/links/crosslink_mipi_1 "$1")
+            res=$(vdlg-lvds-visca -d /dev/links/crosslink_mipi_1 "$1")
         else
             res=$(serial-xfer 9600 "$port" "$1")
         fi
@@ -48,7 +48,7 @@ function Sony() {
 
     for _ in {0..50}; do
         if [[ -n "${has_i2c_serial}" ]]; then
-            res=$(vdlg-lvds-setres -d /dev/links/crosslink_mipi_1 "81090400FF")
+            res=$(vdlg-lvds-visca -d /dev/links/crosslink_mipi_1 "81090400FF")
         else
             res=$(serial-xfer 9600 "$port" "81090400FF")
         fi
@@ -107,7 +107,7 @@ fi
 
 # check if Sony or Not
 if [[ -n "${has_i2c_serial}" ]]; then
-    res=$(vdlg-lvds-setres -d /dev/links/crosslink_mipi_1 "81090002FF")
+    res=$(vdlg-lvds-visca -d /dev/links/crosslink_mipi_1 "81090002FF")
 else
     res=$(serial-xfer 9600 "$port" "81090002FF")
 fi

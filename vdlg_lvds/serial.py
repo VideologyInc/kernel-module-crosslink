@@ -11,7 +11,7 @@ import fcntl
 from vdlg_lvds.ioctl import *
 
 class LvdsSerial():
-    def __init__(self, dev_path, start_wait_ms=100, stop_wait_ms=25, baud=9600):
+    def __init__(self, dev_path, start_wait_ms=100, stop_wait_ms=120, baud=9600):
         self.lock = threading.Lock()
         self.dev = dev_path
         self.baud = baud

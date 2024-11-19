@@ -29,13 +29,27 @@ brands = {
     "wonwoo": "0466"
 }
 
-def poll_command(serial_device, command, retries=2, delay=0.1):
-    for _ in range(retries):
-        response = serial_device.transceive(bytearray.fromhex(command)).hex()
-        if "9041ff" in response:
-            return response
+def poll_command(serial_device, command, retries=2, delay=0):
+    if retries < 1:
+        return serial_device.transceive(bytearray.fromhex(command)).hex()
+    else:
+        for _ in range(retries):
+            response = serial_device.transceive(bytearray.fromhex(command)).hex()
+            if "9041ff" in response:
+                return response
+            sleep(delay)
+            print(f"polling {command}")
+        raise RuntimeError(f"Failed to execute command: {command}")
+
+def poll_status(serial_device, retries=50, delay=0.1):
+    for poll in range(retries):
+        response = serial_device.transceive(bytearray.fromhex("81090400FF")).hex()
+        if "9050" in response:
+            if poll > 5:
+                print(f"Camera status okay")
+            break;
         sleep(delay)
-    raise RuntimeError(f"Failed to execute command: {command}")
+        print(f"polling camera status")
 
 def detect_camera_brand(serial_device):
     response = serial_device.transceive(bytearray.fromhex("81090002FF")).hex()
@@ -54,9 +68,14 @@ def set_resolution(serial_device, resolution, brand):
         else:
             commands = resolution_commands[brand].get(resolution)
             for command in commands:
-                retry = 20 if "1041903" in command else 2
-                res = poll_command(serial_device, command, retries=retry)
-                print(f"cmd: {command}, res: {res}")
+                retry = 0 if "1041903" in command else 2
+                try:
+                    res = poll_command(serial_device, command, retries=retry)
+                except RuntimeError as e:
+                    print(f"Failed to exec cmd {command}")
+                else:
+                    print(f"cmd: {command}, res: {res}")
+            poll_status(serial_device)
 
 def main():
     parser = argparse.ArgumentParser(description="Set camera resolution via LvdsSerial")
