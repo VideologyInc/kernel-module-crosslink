@@ -1,6 +1,6 @@
 
-crosslink-lvds-mipi-objs = crosslink-cam.o crosslink-i2c.o crosslink-tty.o
-obj-m += crosslink-lvds-mipi.o
+lvds2mipi-objs = crosslink-cam.o crosslink-i2c.o crosslink-tty.o
+obj-m += lvds2mipi.o
 
 # EXTRA_CFLAGS += -DDEBUG
 
@@ -16,4 +16,4 @@ clean:
 	make -C ${KERNEL_SRC} M=$(CURDIR) clean
 
 all: default modules_install
-	rmmod -f crosslink-lvds-mipi && modprobe crosslink-lvds-mipi
+	rmmod -f lvds2mipi && modprobe lvds2mipi
