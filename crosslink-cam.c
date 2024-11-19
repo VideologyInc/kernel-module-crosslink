@@ -72,7 +72,7 @@ static long crosslink_ioctl(struct v4l2_subdev *sd, unsigned int cmd, void *arg)
 	struct crosslink_ioctl_serial *serial;
 
 	if (sensor->firmware_loaded == 0)
-		return -ENODEV
+		return -ENODEV;
 
 	pm_runtime_get_sync(sensor->dev);
 	switch (cmd) {
@@ -183,7 +183,7 @@ static int crosslink_ops_get_fmt(struct v4l2_subdev *sub_dev, struct v4l2_subdev
 		pm_runtime_get_sync(sensor->dev);
 		ret  = regmap_raw_read(sensor->regmap, CROSSLINK_REG_COLM_COUNT, &format->format.width, 2);
 		ret |= regmap_raw_read(sensor->regmap, CROSSLINK_REG_LINE_COUNT, &format->format.height, 2);
-		ret |= regmap_read(sensor->regmap, CROSSLINK_REG_STATUS, &status);
+		ret |= regmap_read(sensor->regmap, CROSSLINK_REG_LVDS_STATUS, &status);
 		pm_runtime_put_autosuspend(sensor->dev);
 
 		if(ret || format->format.width == 0 || format->format.height == 0)
@@ -218,7 +218,7 @@ static int crosslink_set_fmt(struct v4l2_subdev *sd, struct v4l2_subdev_state *s
 	// check if the resolution matches the current value
 	ret  = regmap_raw_read(sensor->regmap, CROSSLINK_REG_COLM_COUNT, &sensor->current_res_fr.width, 2);
 	ret |= regmap_raw_read(sensor->regmap, CROSSLINK_REG_LINE_COUNT, &sensor->current_res_fr.height, 2);
-	ret |= regmap_read(sensor->regmap, CROSSLINK_REG_STATUS, &status);
+	ret |= regmap_read(sensor->regmap, CROSSLINK_REG_LVDS_STATUS, &status);
 	pm_runtime_put_autosuspend(sensor->dev);
 
 	if (format->format.width == sensor->current_res_fr.width && format->format.height == sensor->current_res_fr.height) {
@@ -487,7 +487,7 @@ static int __maybe_unused crosslink_resume(struct device *dev)
 				msleep(powerup_wait_ms);
 			}
 			msleep(10);
-			ret |= regmap_read_poll_timeout(sensor->regmap, CROSSLINK_REG_STATUS, status, ((status & 0x1F) == 0x1F), 10000, 4000000); // wait for LVDS pll-locked
+			ret |= regmap_read_poll_timeout(sensor->regmap, CROSSLINK_REG_LVDS_STATUS, status, ((status & 0x1F) == 0x1F), 10000, 4000000); // wait for LVDS pll-locked
 			if (ret)
 				dev_info(sensor->dev, "timeout waiting for LVDS PLL lock: %d\n", status);
 			sensor->state = CRSLK_STATE_IDLE;

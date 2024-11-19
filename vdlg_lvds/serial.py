@@ -8,28 +8,7 @@ from time import sleep, time_ns
 import argparse
 import threading
 import fcntl
-import ctypes
-
-# Define the struct
-class LvdsIoctlSerial(ctypes.Structure):
-    _fields_ = [
-        ("len", ctypes.c_uint32),
-        ("data", ctypes.c_uint8 * 64),
-    ]
-
-# # define UART status bits
-# LVDS_UART_STAT_BUSY_TX       = 0b0010_0000
-# LVDS_UART_STAT_BUSY_RX       = 0b0001_0000
-# LVDS_UART_STAT_DATA_FULLTX   = 0b0000_1000
-# LVDS_UART_STAT_DATA_EMPTYTX  = 0b0000_0100
-# LVDS_UART_STAT_DATA_FULLRX   = 0b0000_0010
-# LVDS_UART_STAT_DATA_EMPTYRX  = 0b0000_0001
-
-# Define the IOCTL commands
-LVDS_CMD_SERIAL_SEND_TX    = 0x7601
-LVDS_CMD_SERIAL_RECV_RX    = 0x7602
-LVDS_CMD_SERIAL_RX_CNT     = 0x7603
-LVDS_CMD_SERIAL_BAUD       = 0x7604
+from vdlg_lvds.ioctl import *
 
 class LvdsSerial():
     def __init__(self, dev_path, start_wait_ms=100, stop_wait_ms=25, baud=9600):
