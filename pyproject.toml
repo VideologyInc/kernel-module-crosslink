@@ -13,7 +13,8 @@ dependencies = [
 ]
 
 [project.scripts]
-vdlg-lvds-visca = "vdlg_lvds.serial:main"
+vdlg-lvds-visca  = "vdlg_lvds.serial:main"
+vdlg-lvds-setres = "vdlg_lvds.set_res:main"
 
 [project.urls]
 Homepage = "https://github.com/VideologyInc/kernel-module-crosslink"
