@@ -1,0 +1,22 @@
+[build-system]
+requires = ["setuptools", "setuptools-scm"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "vdlg_lvds"
+description = "Videology LVDS-2-MIPI converter python functions"
+dynamic = ["version"]
+readme = "README.md"
+requires-python = ">=3.7"
+dependencies = [
+    "python-periphery > 2.3"
+]
+
+[project.scripts]
+vdlg-lvds-visca = "vdlg_lvds.serial:main"
+
+[project.urls]
+Homepage = "https://github.com/VideologyInc/kernel-module-crosslink"
+
+[tool.setuptools]
+packages = ["vdlg_lvds"]
