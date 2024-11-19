@@ -716,7 +716,7 @@ static const struct i2c_device_id crosslink_id[] = {
 MODULE_DEVICE_TABLE(i2c, crosslink_id);
 
 static const struct of_device_id crosslink_dt_ids[] = {
-	{ .compatible = "scailx,crosslink" },
+	{ .compatible = "scailx,lvds2mipi" },
 	{ /* sentinel */ }
 };
 MODULE_DEVICE_TABLE(of, crosslink_dt_ids);
