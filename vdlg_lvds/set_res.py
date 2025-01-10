@@ -13,7 +13,7 @@ resolution_commands = {
         "1080p50": ["81010424720104FF", "81010424740001FF", "8101041903FF"],
         "1080p60": ["81010424720105FF", "81010424740001FF", "8101041903FF"],
     },
-    "wonwoo": {
+    "videology": {
     "720p25": ["81010424720101FF", "81010424740000FF"],
     "720p30": ["8101042472000EFF", "81010424740000FF"],
     "720p50": ["8101042472000CFF", "81010424740000FF"],
@@ -25,8 +25,8 @@ resolution_commands = {
     }
 }
 brands = {
-    "sony": "0711",
-    "wonwoo": "0466"
+    "sony": "2007",
+    "videology": "2004"
 }
 
 def poll_command(serial_device, command, retries=2, delay=0):
