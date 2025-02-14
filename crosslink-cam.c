@@ -68,6 +68,7 @@ static long crosslink_ioctl(struct v4l2_subdev *sd, unsigned int cmd, void *arg)
 {
 	long ret = 0;
 	unsigned int baud;
+	u8 address = 0;
 	struct crosslink_dev *sensor = to_crosslink_dev(sd);
 	struct crosslink_ioctl_serial *serial;
 
@@ -147,6 +148,23 @@ static long crosslink_ioctl(struct v4l2_subdev *sd, unsigned int cmd, void *arg)
 			dev_dbg_ratelimited(sensor->dev, "%s: CROSSLINK_CMD_FORCE_HVSYNC_INV\n", __func__);
 			serial = (struct crosslink_ioctl_serial *)arg;
 			ret = regmap_write(sensor->regmap, CROSSLINK_REG_LVDS_INV, serial->len);
+			break;
+		case CROSSLINK_CMD_GET_REGS:
+			dev_dbg_ratelimited(sensor->dev, "%s: CROSSLINK_CMD_GET_REGS\n", __func__);
+			serial = (struct crosslink_ioctl_serial *)arg;
+			address = serial->data[0];
+			ret = regmap_bulk_read(sensor->regmap, address, serial->data, serial->len);
+			break;
+		case CROSSLINK_CMD_SET_REGS:
+			dev_dbg_ratelimited(sensor->dev, "%s: CROSSLINK_CMD_SET_REGS\n", __func__);
+			serial = (struct crosslink_ioctl_serial *)arg;
+			address = serial->data[0];
+			ret = regmap_bulk_write(sensor->regmap, address, serial->data, serial->len);
+			break;
+		case CROSSLINK_CMD_SERIAL_RX_LAST:
+			dev_dbg_ratelimited(sensor->dev, "%s: CROSSLINK_CMD_SERIAL_RX_LAST\n", __func__);
+			serial = (struct crosslink_ioctl_serial *)arg;
+			ret = regmap_read(sensor->regmap, CROSSLINK_REG_UART_RX_LAST, &serial->len);
 			break;
 		default:
 			ret = -EINVAL;

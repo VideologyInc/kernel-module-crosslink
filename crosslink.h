@@ -73,6 +73,7 @@ enum crosslink_regs {
 	CROSSLINK_REG_LVDS_STATUS = 0x8,// RO: 8:  embedded_hv_valid & hv_sync_inverted & is_8ch_not_4ch & pll_lock_int & gddr_rdy_int & bit_lock_int & word_lock_int & bw_rdy_int;
 	CROSSLINK_REG_UART_STAT = 0x9,  // RO: 8:  board_detect2 & board_detect1 & s_busy_tx & s_busy_rx & s_data_fulltx & s_data_emptytx & s_data_fullrx & s_data_emptyrx;
 	CROSSLINK_REG_UART_RX_CNT= 0xA, // RO: 8:  count of bytes in UART RX fifo
+	CROSSLINK_REG_UART_RX_LAST= 0xB,// RO: 8:  last byte received. Can check the last byte without emptying the RX fifo.
 	CROSSLINK_REG_UART_PRESCL= 0xC, // RW:16:  UART Prescaler from 24 MHz. default=2500 => 24M/2500=9600 baud.
 	CROSSLINK_REG_FRAME_PERIOD= 0xE,// RO:16:  FRAME PERIOD	frame period register. micro-seconds per frame.
 	CROSSLINK_REG_PX_MHZ = 0x10,    //RO: 8:  pixel-clk freq in Mhz
@@ -107,6 +108,9 @@ enum crosslink_ioctl_cmds {
 	CROSSLINK_CMD_GET_COLM_COUNT	= 0x760B,
 	CROSSLINK_CMD_SET_POWERDOWN		= 0x760C,
 	CROSSLINK_CMD_FORCE_HVSYNC_INV	= 0x760D,
+	CROSSLINK_CMD_GET_REGS			= 0x760E,
+	CROSSLINK_CMD_SET_REGS			= 0x760F,
+	CROSSLINK_CMD_SERIAL_RX_LAST	= 0x7610,
 };
 
 /* function protoypes */
