@@ -2,6 +2,7 @@ import argparse
 from time import sleep
 from vdlg_lvds.ioctl import *
 import fcntl
+import glob
 
 def get_resolution(dev):
     ioctl_serial = LvdsIoctlSerial()
@@ -16,7 +17,9 @@ def get_resolution(dev):
 
 def main():
     parser = argparse.ArgumentParser(description="Get current LVDS camera resolution")
-    parser.add_argument("-d", "--dev", type=str, default="/dev/v4l-subdev1", help="Device path")
+    lvds_devs = glob.glob("/dev/links/lvds*")
+    default_lvds = lvds_devs[0] if lvds_devs else "/dev/v4l-subdev1"
+    parser.add_argument("-d", "--dev", type=str, default=default_lvds, help="Device path")
     args = parser.parse_args()
     get_resolution(args.dev)
 

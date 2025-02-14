@@ -42,6 +42,24 @@ class LvdsSerial():
             fcntl.ioctl(f, LVDS_CMD_SERIAL_RX_CNT, ioctl_serial)
         return ioctl_serial.len
 
+    def get_rx_last_byte(self):
+        ioctl_serial = LvdsIoctlSerial()
+        with open(self.dev) as f:
+            fcntl.ioctl(f, LVDS_CMD_SERIAL_RX_LAST, ioctl_serial)
+        return ioctl_serial.len
+
+    def get_uart_status(self):
+        ioctl_serial = LvdsIoctlSerial()
+        with open(self.dev) as f:
+            fcntl.ioctl(f, LVDS_CMD_GET_UART_STATUS, ioctl_serial)
+        empty_rx = ioctl_serial.len & 0x1
+        full_rx  = ioctl_serial.len & 0x2
+        empty_tx = ioctl_serial.len & 0x4
+        full_tx  = ioctl_serial.len & 0x8
+        busy_rx  = ioctl_serial.len & 0x10
+        busy_tx  = ioctl_serial.len & 0x20
+        return empty_rx, full_rx, empty_tx, full_tx, busy_rx, busy_tx
+
     def get_baud(self):
         ioctl_serial = LvdsIoctlSerial()
         with open(self.dev) as f:
