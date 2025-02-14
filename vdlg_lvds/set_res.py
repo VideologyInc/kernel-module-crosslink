@@ -3,7 +3,17 @@ from time import sleep
 from vdlg_lvds.serial import LvdsSerial
 
 resolution_commands = {
-    "sony": {
+    "sony_ev75xx": {
+        "720p25": ["81010424720101FF", "81010424740000FF", "8101041903FF"],
+        "720p30": ["8101042472000FFF", "81010424740000FF", "8101041903FF"],
+        "720p50": ["8101042472000CFF", "81010424740000FF", "8101041903FF"],
+        "720p60": ["8101042472000AFF", "81010424740000FF", "8101041903FF"],
+        "1080p25": ["81010424720008FF", "81010424740000FF", "8101041903FF"],
+        "1080p30": ["81010424720007FF", "81010424740000FF", "8101041903FF"],
+        "1080p50": ["81010424720104FF", "81010424740001FF", "8101041903FF"],
+        "1080p60": ["81010424720105FF", "81010424740001FF", "8101041903FF"],
+    },
+    "sony_ev95xx": {
         "720p25": ["81010424720101FF", "81010424740000FF", "8101041903FF"],
         "720p30": ["8101042472000FFF", "81010424740000FF", "8101041903FF"],
         "720p50": ["8101042472000CFF", "81010424740000FF", "8101041903FF"],
@@ -14,19 +24,48 @@ resolution_commands = {
         "1080p60": ["81010424720105FF", "81010424740001FF", "8101041903FF"],
     },
     "videology": {
-    "720p25": ["81010424720101FF", "81010424740000FF"],
-    "720p30": ["8101042472000EFF", "81010424740000FF"],
-    "720p50": ["8101042472000CFF", "81010424740000FF"],
-    "720p60": ["81010424720009FF", "81010424740000FF"],
-    "1080p25": ["81010424720008FF", "81010424740000FF"],
-    "1080p30": ["81010424720006FF", "81010424740000FF"],
-    "1080p50": ["81010424720104FF", "81010424740001FF"],
-    "1080p60": ["81010424720103FF", "81010424740001FF"],
+        "720p25": ["81010424720101FF", "81010424740000FF"],
+        "720p30": ["8101042472000EFF", "81010424740000FF"],
+        "720p50": ["8101042472000CFF", "81010424740000FF"],
+        "720p60": ["81010424720009FF", "81010424740000FF"],
+        "1080p25": ["81010424720008FF", "81010424740000FF"],
+        "1080p30": ["81010424720006FF", "81010424740000FF"],
+        "1080p50": ["81010424720104FF", "81010424740001FF"],
+        "1080p60": ["81010424720103FF", "81010424740001FF"],
+    },
+    "tamron":{
+        "720p25": ["81010424720101FF", "81010424740000FF", "8101041903FF"],
+        "720p30": ["8101042472000FFF", "81010424740000FF", "8101041903FF"],
+        "720p50": ["81010424720006FF", "81010424740000FF", "8101041903FF"],
+        "720p60": ["81010424720005FF", "81010424740000FF", "8101041903FF"],
+        "1080p25": ["81010424720002FF", "81010424740000FF", "8101041903FF"],
+        "1080p30": ["81010424720001FF", "81010424740000FF", "8101041903FF"],
+        "1080p50": ["81010424720008FF", "81010424740001FF", "8101041903FF"],
+        "1080p60": ["81010424720007FF", "81010424740001FF", "8101041903FF"],
     }
 }
+
 brands = {
-    "sony": "2007",
-    "videology": "2004"
+    "sony_ev75xx" : "2006", # Y0 50 00 20 HH HH JJ JJ KK FF
+    "sony_ev95xx" : "2007", #
+                            # Y05000 2006 xxJJJJFF : EV7520A (to be tested)
+                            # Y05000 2007 xxJJJJFF : EV95..L
+                            #             HH HH = 0640: FCB-EV7520A
+                            #             HH HH = 070E: FCB-EV9500L (tested)
+                            #             HH HH = 0711: FCB-EV9520L (tested)
+    "videology": "2004",    # Y0 50 00 20 mn pq rs tu vw FF
+                            # Y05000 2004 66tuvwFF
+                            #             mn pq = 0466: 24Z2.1-10X-LVDS-462 (tested)
+                            #             mn pq = 0466: 24Z2.1-20X-LVDS     (tested)
+                            #             mn pq = 0466: 24Z2.1-30X-LVDS-462 (tested)
+                            #             mn pq = 0466: 24Z2.1-40X          (tested)
+                            #             mn pq = 0466: 24Z2.1-55X          (tested)
+                            #             mn pq = 0466: 25Z2.4-36X Global shutter (tested)
+
+    "tamron"   : "23F0"     # Y0 50 00 23 HH HH JJ JJ KK FF
+                            # Y05000 23F0 1xJJJJFF
+                            #             HH HH = F011: MP1010-VC
+                            #             HH HH = F017: MP3010M-EV  (tested)
 }
 
 def poll_command(serial_device, command, retries=2, delay=0):
@@ -52,10 +91,10 @@ def poll_status(serial_device, retries=50, delay=0.1):
         print(f"polling camera status")
 
 def detect_camera_brand(serial_device):
-    response = serial_device.transceive(bytearray.fromhex("81090002FF")).hex()
+    response = serial_device.transceive(bytearray.fromhex("81090002FF")).hex().upper()
     for brand, code in brands.items():
         if code in response:
-            print(f"Camera ID response: {response}.\nDetected {brand.upper()} zoomblock")
+            print(f"Camera ID response: {response} with {code}.\nDetected {brand.upper()} zoomblock")
             return brand
     raise ValueError(f"Unknown camera: {response}")
 
