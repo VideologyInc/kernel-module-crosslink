@@ -9,6 +9,7 @@ import argparse
 import threading
 import fcntl
 from vdlg_lvds.ioctl import *
+import glob
 
 class LvdsSerial():
     def __init__(self, dev_path, start_wait_ms=100, stop_wait_ms=120, baud=9600):
@@ -106,11 +107,13 @@ example:
 '''
 
 def main():
+    lvds_devs = glob.glob("/dev/links/lvds*")
+    default_lvds = lvds_devs[0] if lvds_devs else "/dev/v4l-subdev1"
     # get argparse for dev, baudrate, data
     parser = argparse.ArgumentParser(prog='Lvds_Visca')
     parser.epilog = example_text
     parser.formatter_class = argparse.RawDescriptionHelpFormatter
-    parser.add_argument('-d', '--dev', type=str, default="/dev/v4l-subdev1", help='device path')
+    parser.add_argument('-d', '--dev', type=str, default=default_lvds, help='device path')
     parser.add_argument('-t', '--timeout', type=int, default=None, help='read timeout to wait for RX data')
     parser.add_argument('data', type=str, help='data to send, as hex string')
     args = parser.parse_args()

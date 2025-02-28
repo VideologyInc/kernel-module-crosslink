@@ -1,6 +1,7 @@
 import argparse
 from time import sleep
 from vdlg_lvds.serial import LvdsSerial
+import glob
 
 resolution_commands = {
     "sony_ev75xx": {
@@ -117,9 +118,11 @@ def set_resolution(serial_device, resolution, brand):
             poll_status(serial_device)
 
 def main():
+    lvds_devs = glob.glob("/dev/links/lvds*")
+    default_lvds = lvds_devs[0] if lvds_devs else "/dev/v4l-subdev1"
     parser = argparse.ArgumentParser(description="Set camera resolution via LvdsSerial")
     parser.add_argument("resolution", type=str, help="Resolution in the form of '720p60'")
-    parser.add_argument("-d", "--dev", type=str, default="/dev/v4l-subdev1", help="Device path")
+    parser.add_argument("-d", "--dev", type=str, default=default_lvds, help="Device path")
     args = parser.parse_args()
 
     serial_device = LvdsSerial(args.dev)
