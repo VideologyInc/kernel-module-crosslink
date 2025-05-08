@@ -505,7 +505,7 @@ static int __maybe_unused crosslink_resume(struct device *dev)
 				msleep(powerup_wait_ms);
 			}
 			msleep(10);
-			ret |= regmap_read_poll_timeout(sensor->regmap, CROSSLINK_REG_LVDS_STATUS, status, ((status & 0x1F) == 0x1F), 10000, 4000000); // wait for LVDS pll-locked
+			ret |= regmap_read_poll_timeout(sensor->regmap, CROSSLINK_REG_LVDS_STATUS, status, ((status & 0x01) == 0x01), 5000, 2000000); // wait for LVDS pll-locked
 			if (ret)
 				dev_info(sensor->dev, "timeout waiting for LVDS PLL lock: %d\n", status);
 			sensor->state = CRSLK_STATE_IDLE;
