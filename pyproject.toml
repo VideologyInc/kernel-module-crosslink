@@ -14,7 +14,6 @@ dependencies = []
 vdlg-lvds-visca  = "vdlg_lvds.serial:main"
 vdlg-lvds-setres = "vdlg_lvds.set_res:main"
 vdlg-lvds-getres = "vdlg_lvds.get_res:main"
-tamaris-thermal = "vdlg_lvds.tamaris_thermal:main"
 
 [project.urls]
 Homepage = "https://github.com/VideologyInc/kernel-module-crosslink"
