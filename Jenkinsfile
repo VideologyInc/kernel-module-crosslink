@@ -27,7 +27,7 @@ pipeline {
     stage('Fetch Scailx-Yocto SDK') {
       steps {
           copyArtifacts(
-              projectName: "/Videology/lvds_to_mipi/project_lvds_to_mipi/${env.BRANCH_NAME.replaceAll('/', '%2F')}",
+              projectName: "/Videology/lvds_to_mipi/scailx_yocto_cv/${env.BRANCH_NAME.replaceAll('/', '%2F')}",
               selector: lastSuccessful(),
               fingerprintArtifacts: true
           )
