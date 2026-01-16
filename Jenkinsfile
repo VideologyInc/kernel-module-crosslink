@@ -9,7 +9,9 @@ pipeline {
       stage('Checkout sources'){
         steps {
           deleteDir()
-          checkout scm
+          dir('kernel-module-crosslink_cv'){
+            checkout scm
+          }
         }
       }
 
