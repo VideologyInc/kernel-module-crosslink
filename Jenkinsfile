@@ -17,12 +17,14 @@ pipeline {
 
     stage('Environment variables') {
       steps {
-        script{
-        extractEnvironmentVariablesFromRepository()
-        sh (script: 'env', label: 'Print environment variables')
-        buildName env.BUILD_NAME
-        buildDescription "By ${env.COMMIT_AUTHOR_NAME}"
-        isTagBuild = env.TAG_NAME != null
+        dir('kernel-module-crosslink_cv'){
+          script {
+          extractEnvironmentVariablesFromRepository()
+          sh (script: 'env', label: 'Print environment variables')
+          buildName env.BUILD_NAME
+          buildDescription "By ${env.COMMIT_AUTHOR_NAME}"
+          isTagBuild = env.TAG_NAME != null
+          }
         }
       }
     }
