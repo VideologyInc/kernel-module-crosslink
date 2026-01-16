@@ -42,6 +42,8 @@ pipeline {
               dockerImage.inside("--privileged --network host"){
                   COMMAND="mkdir sdk; \
                            ${env.WORKSPACE}/build/deploy/sdk/scailx-glibc-x86_64-scailx-ml-armv8a-scailx-imx8mp-toolchain-*.sh -y -d ${env.WORKSPACE}/sdk; \
+                           source --help; \
+                           ls -als sdk; \
                            source sdk/environment-setup-armv8a-poky-linux; \
                            make -C ${env.WORKSPACE}/sdk/sysroots/armv8a-poky-linux/usr/src/kernel prepare; \
                            make -C kernel-module-crosslink_cv KERNEL_SRC=${env.WORKSPACE}/sdk/sysroots/armv8a-poky-linux/usr/src/kernel"
