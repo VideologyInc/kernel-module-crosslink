@@ -12,7 +12,7 @@ from vdlg_lvds.ioctl import *
 import glob
 
 class LvdsSerial():
-    def __init__(self, dev_path, start_wait_ms=100, stop_wait_ms=120, baud=9600):
+    def __init__(self, dev_path, start_wait_ms=100, stop_wait_ms=10, baud=9600):
         self.lock = threading.Lock()
         self.dev = dev_path
         self.baud = baud
@@ -88,6 +88,42 @@ class LvdsSerial():
                 byte_count = cnt
                 start = time_ns()
         return True
+    
+    def wait_and_recv(self, start_wait_ms, stop_wait_ms, count):
+        ioctl_serial = LvdsIoctlSerial()
+        data_list = []
+        count_reached = False
+        read_len = 0
+
+        # Wait for first data to arrive in buffer
+        start = time_ns()
+        while self.get_rx_count() == 0:
+            sleep(0.001)
+            if time_ns() - start > start_wait_ms*1e6:
+                return False
+        
+        # Read first data and check if more data has arrived, if so, read it.
+        start = time_ns()
+        while time_ns() - start < stop_wait_ms*1e6:
+            cnt = self.get_rx_count()
+            if cnt != 0:
+                start = time_ns()
+                with open(self.dev) as f:
+                    ioctl_serial.len = cnt
+                    fcntl.ioctl(f, LVDS_CMD_SERIAL_RECV_RX, ioctl_serial)
+                data_list.append(bytes(ioctl_serial.data[:ioctl_serial.len]))
+                read_len += cnt
+                if read_len == count:
+                    count_reached = True
+                    break
+            sleep(0.0002)
+
+        # Check if right amount of data is read, or no length is given.
+        if count_reached or count == 0:
+            return_data = b''.join(data_list)
+            return return_data
+        else:
+            return -1
 
     def transceive(self, data: bytes, count:int=0, start_wait_ms=None, stop_wait_ms=None):
         if start_wait_ms is None:
@@ -97,8 +133,7 @@ class LvdsSerial():
         with self.lock:
             self.recv()
             self.send(data)
-            self.wait_for_rx_stable(start_wait_ms, stop_wait_ms)
-            data = self.recv(count)
+            data = self.wait_and_recv(start_wait_ms, stop_wait_ms, count)
         return data
 
 example_text = '''
