@@ -123,7 +123,7 @@ class LvdsSerial():
             return_data = b''.join(data_list)
             return return_data
         else:
-            return -1
+            return False
 
     def transceive(self, data: bytes, count:int=0, start_wait_ms=None, stop_wait_ms=None):
         if start_wait_ms is None:

@@ -74,20 +74,24 @@ def poll_command(serial_device, command, retries=2, delay=0):
         return serial_device.transceive(bytearray.fromhex(command)).hex()
     else:
         for _ in range(retries):
-            response = serial_device.transceive(bytearray.fromhex(command)).hex()
-            if "9041ff" in response:
-                return response
+            response = serial_device.transceive(bytearray.fromhex(command))
+            if response:
+                response = response.hex()
+                if "9041ff" in response:
+                    return response
             sleep(delay)
             print(f"polling {command}")
         raise RuntimeError(f"Failed to execute command: {command}")
 
 def poll_status(serial_device, retries=50, delay=0.1):
     for poll in range(retries):
-        response = serial_device.transceive(bytearray.fromhex("81090400FF")).hex()
-        if "9050" in response:
-            if poll > 5:
-                print(f"Camera status okay")
-            break;
+        response = serial_device.transceive(bytearray.fromhex("81090400FF"))
+        if response:
+            response = response.hex()
+            if "9050" in response:
+                if poll > 5:
+                    print(f"Camera status okay")
+                break;
         sleep(delay)
         print(f"polling camera status")
 
