@@ -96,11 +96,13 @@ def poll_status(serial_device, retries=50, delay=0.1):
         print(f"polling camera status")
 
 def detect_camera_brand(serial_device):
-    response = serial_device.transceive(bytearray.fromhex("81090002FF")).hex().upper()
-    for brand, code in brands.items():
-        if code in response:
-            print(f"Camera ID response: {response} with {code}.\nDetected {brand.upper()} zoomblock")
-            return brand
+    response = serial_device.transceive(bytearray.fromhex("81090002FF"))
+    if response:
+      response = response.hex().upper()
+      for brand, code in brands.items():
+          if code in response:
+              print(f"Camera ID response: {response} with {code}.\nDetected {brand.upper()} zoomblock")
+              return brand
     raise ValueError(f"Unknown camera: {response}")
 
 def set_resolution(serial_device, resolution, brand):
