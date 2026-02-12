@@ -115,6 +115,32 @@ enum crosslink_ioctl_cmds {
   CROSSLINK_CMD_GET_HF_CNT      =  0x7611
 };
 
+// Pixel counts that result from the known pixel frequencies.
+// Max counter = 2**16
+// X counters = 10 
+static const int camera_pixel_counts[] = {
+  105917, // 148.5 MHz
+  211834, // 74.25 MHz
+  423667, // 37.125 Mhz
+  764411  // 20.58 MHz (Tamarisk)
+};
+
+// 110% of the counters.
+static const int camera_pixel_counts_high[] = {
+  116508, // 148.5 MHz
+  233017, // 74.25 MHz
+  466034, // 37.125 Mhz
+  840853  // 20.576 MHz (Tamarisk);
+};
+
+// 90% of the counters.
+static const int camera_pixel_counts_low[] = {
+  95325, // 148.5 MHz
+  190650, // 74.25 MHz
+  381300, // 37.125 Mhz
+  687970  // 20.576 MHz (Tamarisk)
+};
+
 /* function protoypes */
 extern int crosslink_tty_probe(struct crosslink_dev *sensor);
 extern int crosslink_fpga_ops_write_init(struct gpio_desc *reset, struct i2c_client *client);

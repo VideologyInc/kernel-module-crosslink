@@ -45,6 +45,33 @@ static inline struct crosslink_dev *to_crosslink_dev(struct v4l2_subdev *sd)
 	return container_of(sd, struct crosslink_dev, sd);
 }
 
+// Corrects the given fps based on the given hf_cnt.
+static int correct_period(struct v4l2_subdev *sub_dev, int *period, int hf_cnt)
+{
+	int correction_factor = 0;
+	const int div_mult = 1000000;
+	long long pixel_count_mult = 0;
+	long long period_mult = 0;
+
+	// Compare to known count ranges and determine correction factor.
+	for (u8 i = 0; i < ARRAY_SIZE(camera_pixel_counts); i++) {
+		if(hf_cnt > camera_pixel_counts_low[i] && hf_cnt < camera_pixel_counts_high[i]) {
+			pixel_count_mult = (long long)camera_pixel_counts[i] * div_mult;
+			correction_factor = DIV_ROUND_CLOSEST(pixel_count_mult, hf_cnt);
+			break;
+		}
+	}
+
+	if (correction_factor == 0) {
+		dev_info(sub_dev->dev, "Pixel frequency count was outside known values: %d\n", hf_cnt);
+		return 0;
+	}
+
+	period_mult = (long long)*period * correction_factor;
+	*period = DIV_ROUND_CLOSEST(period_mult, div_mult);
+	return 0;
+}
+
 /* --------------- Subdev Operations --------------- */
 
 static int crosslink_s_power(struct v4l2_subdev *sd, int on)
@@ -331,26 +358,30 @@ static int ops_get_frame_interval(struct v4l2_subdev *sub_dev, struct v4l2_subde
 {
 	struct crosslink_dev *sensor = to_crosslink_dev(sub_dev);
 	int ret = 0;
-	int period=0, framerate=0;
+	int period = 0;
+  int hf_cnt = 0;
+  int framerate = 0;
 
 	dev_dbg(sub_dev->dev, "%s: \n", __func__);
 
 	if (fi->pad >= NUM_PADS)
 		return -EINVAL;
 	pm_runtime_get_sync(sensor->dev);
+  ret = regmap_raw_read(sensor->regmap, CROSSLINK_REG_HF_CNT, &hf_cnt, 3);
 	ret = regmap_raw_read(sensor->regmap, CROSSLINK_REG_FRAME_PERIOD, &period, 2);
 	pm_runtime_put_autosuspend(sensor->dev);
-	if(ret || period==0 || period==U16_MAX)
+	if(ret || period==0 || period==U16_MAX || hf_cnt==0)
 		return ret;
 	else {
+
+    correct_period(sub_dev, &period, hf_cnt);
+
 		dev_dbg(sub_dev->dev, "period: %d\n", period);
 		framerate = DIV_ROUND_CLOSEST(1000000, period);
 		sensor->current_res_fr.framerate = framerate;
 		dev_dbg(sub_dev->dev, "%s, framerate: %d\n", __func__, framerate);
-		// fi->interval.numerator = period;
-		// fi->interval.denominator = 1000000;
 		fi->interval.numerator = 1;
-		fi->interval.denominator =DIV_ROUND_CLOSEST(1000000, period);
+		fi->interval.denominator = framerate;
 		sensor->current_res_fr.framerate = framerate;
 		return 0;
 	}
