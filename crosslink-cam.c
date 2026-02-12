@@ -166,6 +166,11 @@ static long crosslink_ioctl(struct v4l2_subdev *sd, unsigned int cmd, void *arg)
 			serial = (struct crosslink_ioctl_serial *)arg;
 			ret = regmap_read(sensor->regmap, CROSSLINK_REG_UART_RX_LAST, &serial->len);
 			break;
+    case CROSSLINK_CMD_GET_HF_CNT:
+			dev_dbg_ratelimited(sensor->dev, "%s: CROSSLINK_CMD_GET_HF_CNT\n", __func__);
+			serial = (struct crosslink_ioctl_serial *)arg;
+			ret = regmap_raw_read(sensor->regmap, CROSSLINK_REG_HF_CNT, &serial->len, 3);
+			break;
 		default:
 			ret = -EINVAL;
 	}

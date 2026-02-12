@@ -77,6 +77,7 @@ enum crosslink_regs {
 	CROSSLINK_REG_UART_PRESCL= 0xC, // RW:16:  UART Prescaler from 24 MHz. default=2500 => 24M/2500=9600 baud.
 	CROSSLINK_REG_FRAME_PERIOD= 0xE,// RO:16:  FRAME PERIOD	frame period register. micro-seconds per frame.
 	CROSSLINK_REG_PX_MHZ = 0x10,    //RO: 8:  pixel-clk freq in Mhz
+  CROSSLINK_REG_HF_CNT = 0x12,    //RO: 24:  counter to check inaccuracy in the HFCLK
 	CROSSLINK_REG_SERIAL = 0x80,    // RW:XX:  Any bytes read/written above 0x80 are read from or written to the UART RX/TX fifos. Fifos are 32 bytes deep.
 };
 
@@ -111,6 +112,7 @@ enum crosslink_ioctl_cmds {
 	CROSSLINK_CMD_GET_REGS			= 0x760E,
 	CROSSLINK_CMD_SET_REGS			= 0x760F,
 	CROSSLINK_CMD_SERIAL_RX_LAST	= 0x7610,
+  CROSSLINK_CMD_GET_HF_CNT      =  0x7611
 };
 
 /* function protoypes */
