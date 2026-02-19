@@ -73,6 +73,12 @@ class LvdsSerial():
         with open(self.dev) as f:
             fcntl.ioctl(f, LVDS_CMD_SERIAL_BAUD, ioctl_serial)
 
+    def set_video_format(self, video_format:int):
+        ioctl_serial = LvdsIoctlSerial()
+        ioctl_serial.len = video_format
+        with open(self.dev) as f:
+            fcntl.ioctl(f, LVDS_CMD_SET_VIDEOFORMAT, ioctl_serial)
+
     def wait_for_rx_stable(self, start_wait_ms, stop_wait_ms):
         start = time_ns()
         while self.get_rx_count() == 0:

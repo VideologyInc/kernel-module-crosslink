@@ -33,6 +33,19 @@
 #define CROSSLINK_IDCODE		0x43002C01
 #define CROSSLINK_RESET_RETRY_CNT	2
 
+#define PIXEL_CNT_MAX 65536
+#define PIXEL_CNT_AMOUNT 20
+#define PIXEL_CNT_FPGA_CLK_FREQ 24
+#define PIXEL_CNT_148_5 			((int)((PIXEL_CNT_MAX * PIXEL_CNT_AMOUNT * PIXEL_CNT_FPGA_CLK_FREQ) / (148.5))) 					// 148.5 MHz
+#define PIXEL_CNT_148_5_1001	((int)((PIXEL_CNT_MAX * PIXEL_CNT_AMOUNT * PIXEL_CNT_FPGA_CLK_FREQ) / (148.5 / 1.001)))
+#define PIXEL_CNT_74_25 			((int)((PIXEL_CNT_MAX * PIXEL_CNT_AMOUNT * PIXEL_CNT_FPGA_CLK_FREQ) / (74.25)))						// 74.25 MHz
+#define PIXEL_CNT_74_25_1001	((int)((PIXEL_CNT_MAX * PIXEL_CNT_AMOUNT * PIXEL_CNT_FPGA_CLK_FREQ) / (74.25 / 1.001)))
+#define PIXEL_CNT_37_125			((int)((PIXEL_CNT_MAX * PIXEL_CNT_AMOUNT * PIXEL_CNT_FPGA_CLK_FREQ) / (37.125)))					// 37.125 MHz
+#define PIXEL_CNT_37_125_1001	((int)((PIXEL_CNT_MAX * PIXEL_CNT_AMOUNT * PIXEL_CNT_FPGA_CLK_FREQ) / (37.125 / 1.001)))
+#define PIXEL_CNT_20_567			((int)((PIXEL_CNT_MAX * PIXEL_CNT_AMOUNT * PIXEL_CNT_FPGA_CLK_FREQ) / (20.567)))					// 20.576 MHz (Tamarisk)
+#define PIXEL_CNT_HIGH(x) ((int)((x) * 1.1))
+#define PIXEL_CNT_LOW(x) ((int)((x) * 0.9))
+
 struct resolution {
 	u16 width;
 	u16 height;
@@ -58,6 +71,7 @@ struct crosslink_dev {
 	char of_name[32];
 	int framerate;
 	int enable_powerdown;
+	int video_format;
 	int csi_id;
 	int has_serial;
 	int state;
@@ -112,33 +126,53 @@ enum crosslink_ioctl_cmds {
 	CROSSLINK_CMD_GET_REGS			= 0x760E,
 	CROSSLINK_CMD_SET_REGS			= 0x760F,
 	CROSSLINK_CMD_SERIAL_RX_LAST	= 0x7610,
-  CROSSLINK_CMD_GET_HF_CNT      =  0x7611
+  CROSSLINK_CMD_GET_HF_CNT      = 0x7611,
+	CROSSLINK_CMD_SET_VIDEOFORMAT = 0x7612
 };
 
 // Pixel counts that result from the known pixel frequencies.
 // Max counter = 2**16
 // X counters = 10 
-static const int camera_pixel_counts[] = {
-  105917, // 148.5 MHz
-  211834, // 74.25 MHz
-  423667, // 37.125 Mhz
-  764411  // 20.58 MHz (Tamarisk)
+static const int camera_pixel_counts_pal[] = {
+  PIXEL_CNT_148_5,
+  PIXEL_CNT_74_25,
+	PIXEL_CNT_37_125,
+	PIXEL_CNT_20_567
+};
+static const int camera_pixel_counts_ntsc[] = {
+  PIXEL_CNT_148_5_1001,
+  PIXEL_CNT_74_25_1001,
+	PIXEL_CNT_37_125_1001,
+	PIXEL_CNT_20_567
 };
 
+
 // 110% of the counters.
-static const int camera_pixel_counts_high[] = {
-  116508, // 148.5 MHz
-  233017, // 74.25 MHz
-  466034, // 37.125 Mhz
-  840853  // 20.576 MHz (Tamarisk);
+static const int camera_pixel_counts_pal_high[] = {
+  PIXEL_CNT_HIGH(PIXEL_CNT_148_5),
+  PIXEL_CNT_HIGH(PIXEL_CNT_74_25),
+	PIXEL_CNT_HIGH(PIXEL_CNT_37_125),
+	PIXEL_CNT_HIGH(PIXEL_CNT_20_567)
+};
+static const int camera_pixel_counts_ntsc_high[] = {
+  PIXEL_CNT_HIGH(PIXEL_CNT_148_5_1001),
+  PIXEL_CNT_HIGH(PIXEL_CNT_74_25_1001),
+  PIXEL_CNT_HIGH(PIXEL_CNT_37_125_1001),
+	PIXEL_CNT_HIGH(PIXEL_CNT_20_567)
 };
 
 // 90% of the counters.
-static const int camera_pixel_counts_low[] = {
-  95325, // 148.5 MHz
-  190650, // 74.25 MHz
-  381300, // 37.125 Mhz
-  687970  // 20.576 MHz (Tamarisk)
+static const int camera_pixel_counts_pal_low[] = {
+  PIXEL_CNT_LOW(PIXEL_CNT_148_5),
+  PIXEL_CNT_LOW(PIXEL_CNT_74_25),
+	PIXEL_CNT_LOW(PIXEL_CNT_37_125),
+	PIXEL_CNT_LOW(PIXEL_CNT_20_567)
+};
+static const int camera_pixel_counts_ntsc_low[] = {
+  PIXEL_CNT_LOW(PIXEL_CNT_148_5_1001),
+  PIXEL_CNT_LOW(PIXEL_CNT_74_25_1001),
+  PIXEL_CNT_LOW(PIXEL_CNT_37_125_1001),
+	PIXEL_CNT_LOW(PIXEL_CNT_20_567)
 };
 
 /* function protoypes */
