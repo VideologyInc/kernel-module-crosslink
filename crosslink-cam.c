@@ -181,8 +181,13 @@ static long crosslink_ioctl(struct v4l2_subdev *sd, unsigned int cmd, void *arg)
 			break;
     case CROSSLINK_CMD_SET_VIDEOFORMAT:
 			dev_dbg_ratelimited(sensor->dev, "%s: CROSSLINK_CMD_SET_VIDEOFORMAT\n", __func__);
-			 serial = (struct crosslink_ioctl_serial *)arg;
-       sensor->video_format = serial->len;
+			serial = (struct crosslink_ioctl_serial *)arg;
+			sensor->video_format = serial->len;
+			break;
+		case CROSSLINK_CMD_GET_VIDEOFORMAT:
+			dev_dbg_ratelimited(sensor->dev, "%s: CROSSLINK_CMD_GET_VIDEOFORMAT\n", __func__);
+			serial = (struct crosslink_ioctl_serial *)arg;
+			serial->len = sensor->video_format;
 			break;
 		case CROSSLINK_CMD_FORCE_HVSYNC_INV:
 			dev_dbg_ratelimited(sensor->dev, "%s: CROSSLINK_CMD_FORCE_HVSYNC_INV\n", __func__);

@@ -73,6 +73,12 @@ class LvdsSerial():
         with open(self.dev) as f:
             fcntl.ioctl(f, LVDS_CMD_SERIAL_BAUD, ioctl_serial)
 
+    def get_video_format(self):
+        ioctl_serial = LvdsIoctlSerial()
+        with open(self.dev) as f:
+            fcntl.ioctl(f, LVDS_CMD_GET_VIDEOFORMAT, ioctl_serial)
+        return ioctl_serial.len
+
     def set_video_format(self, video_format:int):
         ioctl_serial = LvdsIoctlSerial()
         ioctl_serial.len = video_format

@@ -26,6 +26,7 @@ LVDS_CMD_SERIAL_RX_LAST	    = 0x7610
 LVDS_CMD_GET_HF_CNT	        = 0x7611
 LVDS_CMD_GET_PIX_CNT	      = 0x7612
 LVDS_CMD_SET_VIDEOFORMAT    = 0x7613
+LVDS_CMD_GET_VIDEOFORMAT    = 0x7614
 
 # Define the struct
 class LvdsIoctlSerial(ctypes.Structure):
