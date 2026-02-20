@@ -46,32 +46,28 @@ static inline struct crosslink_dev *to_crosslink_dev(struct v4l2_subdev *sd)
 }
 
 // Corrects the given fps based on the given hf_cnt.
-static int correct_period(struct v4l2_subdev *sub_dev, int *period, int hf_cnt)
+static int correct_period(struct v4l2_subdev *sub_dev, unsigned long *period, unsigned hf_cnt, unsigned long pixel_cnt)
 {
-	int correction_factor = 0;
-	const int div_mult = 1000000;
-	long long pixel_count_mult = 0;
-	long long period_mult = 0;
   struct crosslink_dev *sensor = to_crosslink_dev(sub_dev);
 
   if (sensor->video_format == 0) {
     // PAL
-    // Compare to known count ranges and determine correction factor.
+    // Compare to known count ranges and determine pixel clock frequency.
     for (u8 i = 0; i < ARRAY_SIZE(camera_pixel_counts_pal); i++) {
       if(hf_cnt > camera_pixel_counts_pal_low[i] && hf_cnt < camera_pixel_counts_pal_high[i]) {
-        pixel_count_mult = (long long)camera_pixel_counts_pal[i] * div_mult;
-        correction_factor = DIV_ROUND_CLOSEST(pixel_count_mult, hf_cnt);
-        break;
+        // Calculate the period in nano seconds (from femto seconds period length).
+        *period = (unsigned long)DIV_ROUND_CLOSEST_ULL((unsigned long long)pixel_cnt * camera_pixel_periods_pal[i], 1000000);
+        return 0;
       }
     }
   }else if (sensor->video_format == 1) {
     // NTSC
-    // Compare to known count ranges and determine correction factor.
+    // Compare to known count ranges and determine pixel clock frequency.
     for (u8 i = 0; i < ARRAY_SIZE(camera_pixel_counts_ntsc); i++) {
       if(hf_cnt > camera_pixel_counts_ntsc_low[i] && hf_cnt < camera_pixel_counts_ntsc_high[i]) {
-        pixel_count_mult = (long long)camera_pixel_counts_ntsc[i] * div_mult;
-        correction_factor = DIV_ROUND_CLOSEST(pixel_count_mult, hf_cnt);
-        break;
+        // Calculate the period in nano seconds (from femto seconds period length).
+        *period = (unsigned long)DIV_ROUND_CLOSEST_ULL((unsigned long long)pixel_cnt * camera_pixel_periods_ntsc[i], 1000000);
+        return 0;
       }
     }
   }else {
@@ -79,15 +75,8 @@ static int correct_period(struct v4l2_subdev *sub_dev, int *period, int hf_cnt)
     return -EINVAL;
   }
 
-  dev_info(sub_dev->dev, "TEST video_format value: %d\n", sensor->video_format);
-
-	if (correction_factor == 0) {
-		dev_info(sub_dev->dev, "Pixel frequency count was outside known values: %d\n", hf_cnt);
-		return 0;
-	}
-
-	period_mult = (long long)*period * correction_factor;
-	*period = DIV_ROUND_CLOSEST(period_mult, div_mult);
+	*period = *period * 1000;
+	dev_info(sensor->dev, "Measured pixel clock count does not align with any known value: %d\nUncorrected period was taken instead.\n", hf_cnt);
 	return 0;
 }
 
@@ -222,6 +211,11 @@ static long crosslink_ioctl(struct v4l2_subdev *sd, unsigned int cmd, void *arg)
 			serial = (struct crosslink_ioctl_serial *)arg;
 			ret = regmap_raw_read(sensor->regmap, CROSSLINK_REG_HF_CNT, &serial->len, 3);
 			break;
+    case CROSSLINK_CMD_GET_PIX_CNT:
+			dev_dbg_ratelimited(sensor->dev, "%s: CROSSLINK_CMD_GET_PIX_CNT\n", __func__);
+			serial = (struct crosslink_ioctl_serial *)arg;
+			ret = regmap_raw_read(sensor->regmap, CROSSLINK_REG_PIX_CNT, &serial->len, 3);
+			break;
 		default:
 			ret = -EINVAL;
 	}
@@ -349,13 +343,12 @@ static int ops_enum_frame_interval(struct v4l2_subdev *sub_dev, struct v4l2_subd
 {
 	struct crosslink_dev *sensor = to_crosslink_dev(sub_dev);
 	int ret = -EINVAL;
-	int period = 0;
-  int hf_cnt = 0;
+	unsigned long period = 0;
+  unsigned hf_cnt = 0;
+  unsigned long pixel_cnt = 0;
   int framerate = 0;
-  // Increasing mult_fact will increase the amount of values after the demical point of the framerate.
-  // 100=x.xx, 1000=x.xxx, etc. 
-	int mult_fact = 1000;
-	int framerate_mult = 0;
+	int frame_mult = 0;
+	int multiplier = 1000;
 
 	dev_dbg(sub_dev->dev, "%s: \n", __func__);
 
@@ -369,20 +362,30 @@ static int ops_enum_frame_interval(struct v4l2_subdev *sub_dev, struct v4l2_subd
 
 	if (fie->index == 0) {
 		pm_runtime_get_sync(sensor->dev);
-    ret = regmap_raw_read(sensor->regmap, CROSSLINK_REG_HF_CNT, &hf_cnt, 3);
-		ret  = regmap_raw_read(sensor->regmap, CROSSLINK_REG_FRAME_PERIOD, &period, 2);
+		ret = regmap_raw_read(sensor->regmap, CROSSLINK_REG_HF_CNT, &hf_cnt, 3);
+		ret = regmap_raw_read(sensor->regmap, CROSSLINK_REG_PIX_CNT, &pixel_cnt, 3);
+		ret = regmap_raw_read(sensor->regmap, CROSSLINK_REG_FRAME_PERIOD, &period, 2);
 		pm_runtime_put_autosuspend(sensor->dev);
-		if(ret || period==0 || period==U16_MAX || hf_cnt==0)
+		if(ret || hf_cnt==0 || pixel_cnt==0)
 			return ret;
 		else {
-      correct_period(sub_dev, &period, hf_cnt);
+    	correct_period(sub_dev, &period, hf_cnt, pixel_cnt);
 
-      dev_dbg(sub_dev->dev, "period: %d\n", period);
-      framerate_mult = (int)DIV_ROUND_CLOSEST_ULL((unsigned long long)1000000 * mult_fact, period);
-      framerate = DIV_ROUND_CLOSEST(framerate_mult, mult_fact);
-      fie->interval.numerator = mult_fact;
-      fie->interval.denominator = framerate_mult;
-			fie->interval.denominator = DIV_ROUND_CLOSEST(1000000, period);
+    	dev_dbg(sub_dev->dev, "period: %lu\n", period);
+			frame_mult = (int)DIV_ROUND_CLOSEST_ULL((unsigned long long)1000000000 * multiplier, period);
+			framerate = DIV_ROUND_CLOSEST(frame_mult, multiplier);
+
+      if (sensor->video_format == 0) {
+				fie->interval.numerator = 1000;
+				fie->interval.denominator = frame_mult;
+			} else if (sensor->video_format == 1) {
+				fie->interval.numerator = 1001;
+				fie->interval.denominator = framerate * 1000;
+			} else {
+				dev_err(sensor->dev, "Incorrect video_format value was set: %d\n", sensor->video_format);
+				return -EINVAL;
+			}
+
 			dev_dbg(sub_dev->dev, "%s, framerate: %d\n", __func__, framerate);;
 			return 0;
 		}
@@ -394,13 +397,12 @@ static int ops_get_frame_interval(struct v4l2_subdev *sub_dev, struct v4l2_subde
 {
 	struct crosslink_dev *sensor = to_crosslink_dev(sub_dev);
 	int ret = 0;
-	int period = 0;
-  int hf_cnt = 0;
+	unsigned long period = 0;
+  unsigned hf_cnt = 0;
+  unsigned long pixel_cnt = 0;
   int framerate = 0;
-  // Increasing mult_fact will increase the amount of values after the demical point of the framerate.
-  // 100=x.xx, 1000=x.xxx, etc. 
-	int mult_fact = 1000;
-	int framerate_mult = 0;
+	int frame_mult = 0;
+	int multiplier = 1000;
 
 	dev_dbg(sub_dev->dev, "%s: \n", __func__);
 
@@ -408,19 +410,30 @@ static int ops_get_frame_interval(struct v4l2_subdev *sub_dev, struct v4l2_subde
 		return -EINVAL;
 	pm_runtime_get_sync(sensor->dev);
   ret = regmap_raw_read(sensor->regmap, CROSSLINK_REG_HF_CNT, &hf_cnt, 3);
-	ret = regmap_raw_read(sensor->regmap, CROSSLINK_REG_FRAME_PERIOD, &period, 2);
+  ret = regmap_raw_read(sensor->regmap, CROSSLINK_REG_PIX_CNT, &pixel_cnt, 3);
+  ret = regmap_raw_read(sensor->regmap, CROSSLINK_REG_FRAME_PERIOD, &period, 2);
 	pm_runtime_put_autosuspend(sensor->dev);
-	if(ret || period==0 || period==U16_MAX || hf_cnt==0)
+	if(ret || hf_cnt==0 || pixel_cnt==0)
 		return ret;
 	else {
 
-    correct_period(sub_dev, &period, hf_cnt);
+    correct_period(sub_dev, &period, hf_cnt, pixel_cnt);
 
-		dev_dbg(sub_dev->dev, "period: %d\n", period);
-		framerate_mult = (int)DIV_ROUND_CLOSEST_ULL((unsigned long long)1000000 * mult_fact, period);
-		framerate = DIV_ROUND_CLOSEST(framerate_mult, mult_fact);
-    fi->interval.numerator = mult_fact;
-		fi->interval.denominator = framerate_mult;
+		dev_dbg(sub_dev->dev, "period: %lu\n", period);
+		frame_mult = (int)DIV_ROUND_CLOSEST_ULL((unsigned long long)1000000000 * multiplier, period);
+		framerate = DIV_ROUND_CLOSEST(frame_mult, multiplier);
+
+    if (sensor->video_format == 0) {
+			fi->interval.numerator = multiplier;
+			fi->interval.denominator = frame_mult;
+		} else if (sensor->video_format == 1) {
+			fi->interval.numerator = 1001;
+			fi->interval.denominator = framerate * 1000;
+		} else {
+			dev_err(sensor->dev, "Incorrect video_format value was set: %d\n", sensor->video_format);
+    	return -EINVAL;
+		}
+		
 		sensor->current_res_fr.framerate = framerate;
 		dev_dbg(sub_dev->dev, "%s, framerate: %d\n", __func__, framerate);
 		return 0;
