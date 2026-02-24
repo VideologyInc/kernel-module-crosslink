@@ -650,6 +650,7 @@ static int crosslink_probe(struct i2c_client *client, const struct i2c_device_id
 	sensor->i2c_client = client;
 	sensor->current_res_fr.height = 0;
 	sensor->current_res_fr.width = 0;
+	sensor->video_format = 0;
 	sensor->enable_powerdown = (int)powerdown_enable;
 
 	// default init sequence initialize sensor to 1080p30 YUV422 UYVY
