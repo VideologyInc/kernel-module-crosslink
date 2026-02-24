@@ -4,7 +4,7 @@ from vdlg_lvds.ioctl import *
 import fcntl
 import glob
 
-# Fixed measurement values set within the FPGA
+# Fixed measurement values set within the LVDS-MIPI Crosslink FPGA
 PIXEL_CNT_MAX = 65536
 PIXEL_CNT_AMOUNT = 10
 PIXEL_CNT_FPGA_CLK_FREQ = 24
@@ -30,7 +30,7 @@ NTSC_FREQS_MHZ = tuple(f / 1.001 for f in (
 camera_pixel_periods_pal = tuple(1 / f for f in PAL_FREQS_MHZ)
 camera_pixel_periods_ntsc = tuple(1 / f for f in NTSC_FREQS_MHZ)
 
-# Pixel counts
+# Expected pixel clock counts per frequency
 camera_pixel_counts_pal = tuple(pixel_cnt(f) for f in PAL_FREQS_MHZ)
 camera_pixel_counts_ntsc = tuple(pixel_cnt(f) for f in NTSC_FREQS_MHZ)
 
@@ -38,7 +38,7 @@ camera_pixel_counts_ntsc = tuple(pixel_cnt(f) for f in NTSC_FREQS_MHZ)
 camera_pixel_counts_pal_high = tuple(x * 1.1 for x in camera_pixel_counts_pal)
 camera_pixel_counts_ntsc_high = tuple(x * 1.1 for x in camera_pixel_counts_ntsc)
 
-# Low (−10%)
+# Low (-10%)
 camera_pixel_counts_pal_low = tuple(x * 0.9 for x in camera_pixel_counts_pal)
 camera_pixel_counts_ntsc_low = tuple(x * 0.9 for x in camera_pixel_counts_ntsc)
 
@@ -73,7 +73,7 @@ def get_resolution(dev):
                     print(f"{hres} x {vres} @ {frame_rate:.2f}")
                     return
         
-        # If no supported pixel frequency was detected, return frequency estimation.
+        # If no supported pixel frequency was detected, return frequency estimation from Crosslink
         frame_rate = 1_000_000.0 / period_estimation
         print(f"{hres} x {vres} @ {frame_rate:.1f}")
 
