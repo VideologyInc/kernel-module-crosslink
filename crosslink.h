@@ -33,6 +33,8 @@
 #define CROSSLINK_IDCODE		0x43002C01
 #define CROSSLINK_RESET_RETRY_CNT	2
 
+#define ENABLE_UART_MASK 0x04
+
 struct resolution {
 	u16 width;
 	u16 height;
@@ -77,6 +79,8 @@ enum crosslink_regs {
 	CROSSLINK_REG_UART_PRESCL= 0xC, // RW:16:  UART Prescaler from 24 MHz. default=2500 => 24M/2500=9600 baud.
 	CROSSLINK_REG_FRAME_PERIOD= 0xE,// RO:16:  FRAME PERIOD	frame period register. micro-seconds per frame.
 	CROSSLINK_REG_PX_MHZ = 0x10,    //RO: 8:  pixel-clk freq in Mhz
+  CROSSLINK_REG_UART_RX_FILLRATE = 0x12,    //RO: 8:  Highest RX FIFO fillrate since UART reset.
+  CROSSLINK_REG_UART_FULL = 0x13,    //RO: 8:  High if any of the FIFOs was full (tx/rx) since UART reset.
 	CROSSLINK_REG_SERIAL = 0x80,    // RW:XX:  Any bytes read/written above 0x80 are read from or written to the UART RX/TX fifos. Fifos are 32 bytes deep.
 };
 
@@ -111,6 +115,8 @@ enum crosslink_ioctl_cmds {
 	CROSSLINK_CMD_GET_REGS			= 0x760E,
 	CROSSLINK_CMD_SET_REGS			= 0x760F,
 	CROSSLINK_CMD_SERIAL_RX_LAST	= 0x7610,
+  CROSSLINK_CMD_GET_UART_RX_FILLRATE = 0x7612,
+  CROSSLINK_CMD_GET_UART_FULL        = 0x7613
 };
 
 /* function protoypes */

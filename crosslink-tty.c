@@ -96,6 +96,12 @@ static int crosslink_tty_write(struct tty_struct *tty, const unsigned char *buf,
 		return -ENOMEM;
 	}
 
+  // Send reset to UART system to clear any remaining data.
+  u32 status;
+  ret  = regmap_read(sensor->regmap, CROSSLINK_REG_ENABLE, &status);
+  ret |= regmap_write(sensor->regmap, CROSSLINK_REG_ENABLE, status &~ ENABLE_UART_MASK);
+  ret |= regmap_write(sensor->regmap, CROSSLINK_REG_ENABLE, status | ENABLE_UART_MASK);
+
 	dev_dbg_ratelimited(sensor->dev, "%s: CROSSLINK_CMD_SERIAL_TX %ld \n", __func__, count);
 	ret = regmap_bulk_write(sensor->regmap, CROSSLINK_REG_SERIAL, buf, count);
 	if (ret)
