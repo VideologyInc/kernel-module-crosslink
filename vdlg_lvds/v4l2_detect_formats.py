@@ -20,6 +20,8 @@ import glob
 import copy
 import math
 
+from vdlg_lvds.detect_cameras_live import detect_camera_type
+
 # Camera key words in device tree and its regular names
 camera_dict = {
     "AR0234": "ar0234",
@@ -36,24 +38,6 @@ Fourcc_Dict = {"YUYV" : "YUY2", "NV12" : "NV12",
     "GREY" : "GRAY8", "Y16 " : "GRAY16_LE", "RGB3" : "RGB", 
     "BGR3" : "BGR", "XR24" : "BGRx", "AR24" : "BGRA"
     }
-
-# Use system chosen device tree name to detect camera type:   ar0234, imx, boson, or ZoomBlock "lvds"
-def detect_camera_type(device="/dev/video0"):
-    if "/dev/video" in device:
-        # Extract camera id
-        dev_str_len = len("/dev/video")
-        id = int(device[dev_str_len:])
-        # Find matching device tree name id.
-        cam_list = glob.iglob("/proc/device-tree/chosen/overlays/cam*")
-        cam_name = "cam" + str(id)
-        for s in cam_list:
-            if cam_name in s:
-                for key, val in camera_dict.items():
-                    if key in s:
-                        return val
-
-    # Cannot find: return default
-    return "ar0234"    
 
 
 def parse_v4l2_formats(device="/dev/video0"):
@@ -183,11 +167,11 @@ def v4l2_format_to_gst(format_dict):
 
 # Given camera device path, return supported gstreamer str list.
 def camera_to_gst_list(device):
-    camera_type = detect_camera_type(device)
+    camera_type, cam_path = detect_camera_type(device)
 
     camera_formats = formats_filter_out_unwanted(parse_v4l2_formats(device))
     # Add full resolution and framerate support for ZoomBlock (from visca commands)
-    print(camera_type)
+    # print(camera_type)
     if "zoomblock"==camera_type:
         print("Create new format list for ZoomBlock cameras.")
         camera_formats = add_formats_lvds(camera_formats)
