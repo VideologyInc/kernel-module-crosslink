@@ -5,7 +5,9 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "vdlg_lvds"
 description = "Videology LVDS-2-MIPI converter python functions"
-dynamic = ["version"]
+version = "0.13.9"
+# dynamic = ["version"]
+
 readme = "README.md"
 requires-python = ">=3.7"
 dependencies = []
