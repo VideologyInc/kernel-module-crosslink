@@ -8,6 +8,8 @@ Note: this module is valid only for Linux kernels > 5.12
 
 Updates.
 
+2026.0327.	Added boson_stats.py and updated other py for more Boson camera formats including object and thermal detections for go2rtc.	
+
 2026.0316.	Added py files to detect usb cameras live. Updated version to match Scailx Yocto 0.13.9. Built whl file in ~/dist and tested.
 
 
