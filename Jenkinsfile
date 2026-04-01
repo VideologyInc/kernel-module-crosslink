@@ -1,6 +1,5 @@
 @Library('corevision-library')
 
-git_project_repo='ssh://git@gitea.core-vision.nl:222/Videology/kernel-module-crosslink_cv.git'
 docker_yocto_img='docker-registry.core-vision.nl/videology/scailx_yocto:v0.0.2'
 
 pipeline {
