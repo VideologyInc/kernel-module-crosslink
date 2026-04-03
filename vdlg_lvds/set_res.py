@@ -129,7 +129,8 @@ def set_resolution(serial_device, resolution, brand):
             for command in commands:
                 retry = 0 if "1041903" in command else 2
                 try:
-                    res = poll_command(serial_device, command, retries=retry)
+                    # 100ms delay required otherwise multiple commands after each other fail.
+                    res = poll_command(serial_device, command, retries=retry, delay=0.1)
                 except RuntimeError as e:
                     print(f"Failed to exec cmd {command}")
                 else:
