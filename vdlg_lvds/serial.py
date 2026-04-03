@@ -84,28 +84,17 @@ class LvdsSerial():
         ioctl_serial.len = video_format
         with open(self.dev) as f:
             fcntl.ioctl(f, LVDS_CMD_SET_VIDEOFORMAT, ioctl_serial)
-
-    def wait_for_rx_stable(self, start_wait_ms, stop_wait_ms):
-        start = time_ns()
-        while self.get_rx_count() == 0:
-            sleep(0.002)
-            if time_ns() - start > start_wait_ms*1e6:
-                return False
-        byte_count = self.get_rx_count()
-        start = time_ns()
-        while time_ns() - start < stop_wait_ms*1e6:
-            sleep(0.002)
-            cnt = self.get_rx_count()
-            if cnt != byte_count:
-                byte_count = cnt
-                start = time_ns()
-        return True
     
-    def wait_and_recv(self, start_wait_ms, stop_wait_ms, count):
+    def wait_and_recv(self, start_wait_ms=0, stop_wait_ms=0, count=0):
         ioctl_serial = LvdsIoctlSerial()
         data_list = []
         count_reached = False
         read_len = 0
+
+        if start_wait_ms == 0:
+            start_wait_ms = self.bwms
+        if stop_wait_ms == 0:
+            stop_wait_ms = self.ewms
 
         # Wait for first data to arrive in buffer
         start = time_ns()
