@@ -1,5 +1,4 @@
 import argparse
-from time import sleep
 from vdlg_lvds.ioctl import *
 import fcntl
 import glob
@@ -12,8 +11,10 @@ def get_resolution(dev):
         fcntl.ioctl(f, LVDS_CMD_GET_COLM_COUNT, ioctl_serial)
         hres = ioctl_serial.len
         fcntl.ioctl(f, LVDS_CMD_GET_FRAME_PERIOD, ioctl_serial)
-        frame_rate = 1000000.0 / ioctl_serial.len
-        print(f"{hres} x {vres} @ {frame_rate:.1f}")
+        period = ioctl_serial.len
+
+        frame_rate = 1_000_000_000.0 / period
+        print(f"{hres} x {vres} @ {frame_rate:.2f}")
 
 def main():
     parser = argparse.ArgumentParser(description="Get current LVDS camera resolution")
