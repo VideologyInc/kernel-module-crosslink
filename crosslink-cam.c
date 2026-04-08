@@ -149,6 +149,8 @@ static long crosslink_ioctl(struct v4l2_subdev *sd, unsigned int cmd, void *arg)
 	long ret = 0;
 	unsigned int baud;
 	u8 address = 0;
+  u32 status;
+  u32 temp_serial_len;
 	struct crosslink_dev *sensor = to_crosslink_dev(sd);
 	struct crosslink_ioctl_serial *serial;
 
@@ -158,6 +160,11 @@ static long crosslink_ioctl(struct v4l2_subdev *sd, unsigned int cmd, void *arg)
 	pm_runtime_get_sync(sensor->dev);
 	switch (cmd) {
 		case CROSSLINK_CMD_SERIAL_SEND_TX:
+      // Send reset to UART system to clear any remaining data.
+      ret  = regmap_read(sensor->regmap, CROSSLINK_REG_ENABLE, &status);
+		  ret |= regmap_write(sensor->regmap, CROSSLINK_REG_ENABLE, status &~ ENABLE_UART_MASK);
+      ret |= regmap_write(sensor->regmap, CROSSLINK_REG_ENABLE, status | ENABLE_UART_MASK);
+
 			dev_dbg_ratelimited(sensor->dev, "%s: CROSSLINK_CMD_SERIAL_TX\n", __func__);
 			serial = (struct crosslink_ioctl_serial *)arg;
 			ret = regmap_bulk_write(sensor->regmap, CROSSLINK_REG_SERIAL, serial->data, serial->len);
@@ -168,6 +175,17 @@ static long crosslink_ioctl(struct v4l2_subdev *sd, unsigned int cmd, void *arg)
 			if (serial->len == 0)
 				ret = regmap_read(sensor->regmap, CROSSLINK_REG_UART_RX_CNT, &serial->len);
 			ret = regmap_bulk_read(sensor->regmap, CROSSLINK_REG_SERIAL, serial->data, serial->len);
+			// Check if buffer overflow occured.
+      temp_serial_len = serial->len;
+      ret = regmap_read(sensor->regmap, CROSSLINK_REG_UART_FULL, &serial->len);
+      if ((serial->len & 1) == 1) {
+				dev_warn(sd->dev, "WARNING FPGA TX buffer has overflown!");
+      } 
+			if ((serial->len & 2) == 2) {
+				dev_warn(sd->dev, "WARNING FPGA RX buffer has overflown!");
+			}
+			serial->len = temp_serial_len;
+			
 			break;
 		case CROSSLINK_CMD_SERIAL_RX_CNT:
 			dev_dbg_ratelimited(sensor->dev, "%s: CROSSLINK_CMD_SERIAL_RX_WAITING\n", __func__);
@@ -259,6 +277,15 @@ static long crosslink_ioctl(struct v4l2_subdev *sd, unsigned int cmd, void *arg)
 			serial = (struct crosslink_ioctl_serial *)arg;
 			ret = regmap_read(sensor->regmap, CROSSLINK_REG_UART_RX_LAST, &serial->len);
 			break;
+    case CROSSLINK_CMD_GET_UART_RX_FILLRATE:
+			dev_dbg_ratelimited(sensor->dev, "%s: CROSSLINK_CMD_GET_UART_RX_FILLRATE\n", __func__);
+			serial = (struct crosslink_ioctl_serial *)arg;
+			ret = regmap_read(sensor->regmap, CROSSLINK_REG_UART_RX_FILLRATE, &serial->len);
+			break;
+    case CROSSLINK_CMD_GET_UART_FULL:
+			dev_dbg_ratelimited(sensor->dev, "%s: CROSSLINK_CMD_GET_UART_FULL\n", __func__);
+			serial = (struct crosslink_ioctl_serial *)arg;
+			ret = regmap_read(sensor->regmap, CROSSLINK_REG_UART_FULL, &serial->len);
 		case CROSSLINK_CMD_GET_FRAME_PERIOD:
 			dev_dbg_ratelimited(sensor->dev, "%s: CROSSLINK_CMD_GET_FRAME_PERIOD\n", __func__);
 			serial = (struct crosslink_ioctl_serial *)arg;

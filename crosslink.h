@@ -33,6 +33,8 @@
 #define CROSSLINK_IDCODE		0x43002C01
 #define CROSSLINK_RESET_RETRY_CNT	2
 
+#define ENABLE_UART_MASK 0x04
+
 #define PIXEL_CNT_MAX 65536
 #define PIXEL_CNT_AMOUNT 10
 #define PIXEL_CNT_FPGA_CLK_FREQ 24
@@ -101,8 +103,10 @@ enum crosslink_regs {
 	CROSSLINK_REG_UART_PRESCL= 0xC, // RW:16:  UART Prescaler from 24 MHz. default=2500 => 24M/2500=9600 baud.
 	CROSSLINK_REG_FPGA_PERIOD= 0xE,// RO:16:  FRAME PERIOD	frame period register. micro-seconds per frame.
 	CROSSLINK_REG_PX_MHZ = 0x10,    //RO: 8:  pixel-clk freq in Mhz
-	CROSSLINK_REG_HF_CNT = 0x12,    //RO: 24:  counter to check inaccuracy in the HFCLK
-	CROSSLINK_REG_PIX_CNT = 0x15,   //RO: 24:  pixel clock framerate counter
+  CROSSLINK_REG_UART_RX_FILLRATE = 0x12,    //RO: 8:  Highest RX FIFO fillrate since UART reset.
+  CROSSLINK_REG_UART_FULL = 0x13,    //RO: 8:  High if any of the FIFOs was full (tx/rx) since UART reset.
+	CROSSLINK_REG_HF_CNT = 0x14,    //RO: 24:  counter to check inaccuracy in the HFCLK
+	CROSSLINK_REG_PIX_CNT = 0x17,   //RO: 24:  pixel clock framerate counter
 	CROSSLINK_REG_SERIAL = 0x80,    // RW:XX:  Any bytes read/written above 0x80 are read from or written to the UART RX/TX fifos. Fifos are 32 bytes deep.
 };
 
@@ -137,10 +141,12 @@ enum crosslink_ioctl_cmds {
 	CROSSLINK_CMD_GET_REGS			= 0x760E,
 	CROSSLINK_CMD_SET_REGS			= 0x760F,
 	CROSSLINK_CMD_SERIAL_RX_LAST	= 0x7610,
-	CROSSLINK_CMD_SET_FORMAT_PAL  = 0x7612,
-	CROSSLINK_CMD_SET_FORMAT_NTSC = 0x7613,
-	CROSSLINK_CMD_GET_VIDEOFORMAT = 0x7614,
-	CROSSLINK_CMD_GET_FPGA_PERIOD	= 0x7615
+  CROSSLINK_CMD_GET_UART_RX_FILLRATE = 0x7612,
+  CROSSLINK_CMD_GET_UART_FULL        = 0x7613
+	CROSSLINK_CMD_SET_FORMAT_PAL  = 0x7614,
+	CROSSLINK_CMD_SET_FORMAT_NTSC = 0x7615,
+	CROSSLINK_CMD_GET_VIDEOFORMAT = 0x7616,
+	CROSSLINK_CMD_GET_FPGA_PERIOD	= 0x7617
 };
 
 // Pixel periods denoted in femto seconds.
