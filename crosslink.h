@@ -48,6 +48,9 @@
 #define PIXEL_CNT_HIGH(x) ((int)((x) * 1.1))
 #define PIXEL_CNT_LOW(x) ((int)((x) * 0.9))
 
+#define PERIOD_MULTIPLIER 1000
+#define FPS_NTSC_NUMERATOR ((int)(PERIOD_MULTIPLIER * 1.001 + 0.5))
+
 struct resolution {
 	u16 width;
 	u16 height;
@@ -80,6 +83,11 @@ struct crosslink_dev {
 	int firmware_loaded;
 };
 
+enum video_format_e {
+	FORMAT_PAL = 0,
+	FORMAT_NTSC = 1,
+};
+
 enum crosslink_regs {
 	CROSSLINK_REG_ID = 0x1,         // RO: 8:  Firmware version
 	CROSSLINK_REG_ENABLE = 0x2,     // RW: 8:  [b3]=CAM-POW-EN	[b2]=UART-EN	[b1]=LVDS-EN	[b0]=MIPI-EN
@@ -91,9 +99,9 @@ enum crosslink_regs {
 	CROSSLINK_REG_UART_RX_CNT= 0xA, // RO: 8:  count of bytes in UART RX fifo
 	CROSSLINK_REG_UART_RX_LAST= 0xB,// RO: 8:  last byte received. Can check the last byte without emptying the RX fifo.
 	CROSSLINK_REG_UART_PRESCL= 0xC, // RW:16:  UART Prescaler from 24 MHz. default=2500 => 24M/2500=9600 baud.
-	CROSSLINK_REG_FRAME_PERIOD= 0xE,// RO:16:  FRAME PERIOD	frame period register. micro-seconds per frame.
+	CROSSLINK_REG_FPGA_PERIOD= 0xE,// RO:16:  FRAME PERIOD	frame period register. micro-seconds per frame.
 	CROSSLINK_REG_PX_MHZ = 0x10,    //RO: 8:  pixel-clk freq in Mhz
-  CROSSLINK_REG_HF_CNT = 0x12,    //RO: 24:  counter to check inaccuracy in the HFCLK
+	CROSSLINK_REG_HF_CNT = 0x12,    //RO: 24:  counter to check inaccuracy in the HFCLK
 	CROSSLINK_REG_PIX_CNT = 0x15,   //RO: 24:  pixel clock framerate counter
 	CROSSLINK_REG_SERIAL = 0x80,    // RW:XX:  Any bytes read/written above 0x80 are read from or written to the UART RX/TX fifos. Fifos are 32 bytes deep.
 };
@@ -129,62 +137,62 @@ enum crosslink_ioctl_cmds {
 	CROSSLINK_CMD_GET_REGS			= 0x760E,
 	CROSSLINK_CMD_SET_REGS			= 0x760F,
 	CROSSLINK_CMD_SERIAL_RX_LAST	= 0x7610,
-  CROSSLINK_CMD_GET_HF_CNT      = 0x7611,
-	CROSSLINK_CMD_GET_PIX_CNT     = 0x7612,
-	CROSSLINK_CMD_SET_VIDEOFORMAT = 0x7613,
-	CROSSLINK_CMD_GET_VIDEOFORMAT = 0x7614
+	CROSSLINK_CMD_SET_FORMAT_PAL  = 0x7612,
+	CROSSLINK_CMD_SET_FORMAT_NTSC = 0x7613,
+	CROSSLINK_CMD_GET_VIDEOFORMAT = 0x7614,
+	CROSSLINK_CMD_GET_FPGA_PERIOD	= 0x7615
 };
 
 // Pixel periods denoted in femto seconds.
 static const unsigned long camera_pixel_periods_pal[] = {
-  PIXEL_PERIOD(148.5),
-  PIXEL_PERIOD(74.25),
+	PIXEL_PERIOD(148.5),
+	PIXEL_PERIOD(74.25),
 	PIXEL_PERIOD(37.125),
 	PIXEL_PERIOD(20.576)
 };
 static const unsigned long camera_pixel_periods_ntsc[] = {
-  PIXEL_PERIOD(148.5 / 1.001),
-  PIXEL_PERIOD(74.25 / 1.001),
+	PIXEL_PERIOD(148.5 / 1.001),
+	PIXEL_PERIOD(74.25 / 1.001),
 	PIXEL_PERIOD(37.125 / 1.001)
 };
 
 // Pixel counts that result from the known pixel frequencies.
 static const int camera_pixel_counts_pal[] = {
-  PIXEL_CNT_148_5,
-  PIXEL_CNT_74_25,
+	PIXEL_CNT_148_5,
+	PIXEL_CNT_74_25,
 	PIXEL_CNT_37_125,
 	PIXEL_CNT_20_576
 };
 static const int camera_pixel_counts_ntsc[] = {
-  PIXEL_CNT_148_5_1001,
-  PIXEL_CNT_74_25_1001,
+	PIXEL_CNT_148_5_1001,
+	PIXEL_CNT_74_25_1001,
 	PIXEL_CNT_37_125_1001
 };
 
 // 110% of the counters.
 static const int camera_pixel_counts_pal_high[] = {
-  PIXEL_CNT_HIGH(PIXEL_CNT_148_5),
-  PIXEL_CNT_HIGH(PIXEL_CNT_74_25),
+	PIXEL_CNT_HIGH(PIXEL_CNT_148_5),
+	PIXEL_CNT_HIGH(PIXEL_CNT_74_25),
 	PIXEL_CNT_HIGH(PIXEL_CNT_37_125),
 	PIXEL_CNT_HIGH(PIXEL_CNT_20_576)
 };
 static const int camera_pixel_counts_ntsc_high[] = {
-  PIXEL_CNT_HIGH(PIXEL_CNT_148_5_1001),
-  PIXEL_CNT_HIGH(PIXEL_CNT_74_25_1001),
-  PIXEL_CNT_HIGH(PIXEL_CNT_37_125_1001)
+	PIXEL_CNT_HIGH(PIXEL_CNT_148_5_1001),
+	PIXEL_CNT_HIGH(PIXEL_CNT_74_25_1001),
+	PIXEL_CNT_HIGH(PIXEL_CNT_37_125_1001)
 };
 
 // 90% of the counters.
 static const int camera_pixel_counts_pal_low[] = {
-  PIXEL_CNT_LOW(PIXEL_CNT_148_5),
-  PIXEL_CNT_LOW(PIXEL_CNT_74_25),
+	PIXEL_CNT_LOW(PIXEL_CNT_148_5),
+	PIXEL_CNT_LOW(PIXEL_CNT_74_25),
 	PIXEL_CNT_LOW(PIXEL_CNT_37_125),
 	PIXEL_CNT_LOW(PIXEL_CNT_20_576)
 };
 static const int camera_pixel_counts_ntsc_low[] = {
-  PIXEL_CNT_LOW(PIXEL_CNT_148_5_1001),
-  PIXEL_CNT_LOW(PIXEL_CNT_74_25_1001),
-  PIXEL_CNT_LOW(PIXEL_CNT_37_125_1001)
+	PIXEL_CNT_LOW(PIXEL_CNT_148_5_1001),
+	PIXEL_CNT_LOW(PIXEL_CNT_74_25_1001),
+	PIXEL_CNT_LOW(PIXEL_CNT_37_125_1001)
 };
 
 /* function protoypes */

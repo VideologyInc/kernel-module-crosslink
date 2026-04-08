@@ -79,11 +79,15 @@ class LvdsSerial():
             fcntl.ioctl(f, LVDS_CMD_GET_VIDEOFORMAT, ioctl_serial)
         return ioctl_serial.len
 
-    def set_video_format(self, video_format:int):
+    def set_video_format_pal(self):
         ioctl_serial = LvdsIoctlSerial()
-        ioctl_serial.len = video_format
         with open(self.dev) as f:
-            fcntl.ioctl(f, LVDS_CMD_SET_VIDEOFORMAT, ioctl_serial)
+            fcntl.ioctl(f, LVDS_CMD_SET_FORMAT_PAL, ioctl_serial)
+
+    def set_video_format_ntsc(self):
+        ioctl_serial = LvdsIoctlSerial()
+        with open(self.dev) as f:
+            fcntl.ioctl(f, LVDS_CMD_SET_FORMAT_NTSC, ioctl_serial)
     
     def wait_and_recv(self, start_wait_ms=0, stop_wait_ms=0, count=0):
         ioctl_serial = LvdsIoctlSerial()

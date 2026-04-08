@@ -121,9 +121,9 @@ def set_resolution(serial_device, resolution, brand):
             raise ValueError(f"Unsupported resolution: {resolution}")
         else:
             if "p29" in resolution or "p59" in resolution:
-                serial_device.set_video_format(1)
+                serial_device.set_video_format_ntsc()
             else:
-                serial_device.set_video_format(0)
+                serial_device.set_video_format_pal()
 
             commands = resolution_commands[brand].get(resolution)
             for command in commands:
