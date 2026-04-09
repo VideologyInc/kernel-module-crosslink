@@ -45,6 +45,86 @@ static inline struct crosslink_dev *to_crosslink_dev(struct v4l2_subdev *sd)
 	return container_of(sd, struct crosslink_dev, sd);
 }
 
+// Corrects the given fps based on the given hf_cnt.
+static int correct_period(struct v4l2_subdev *sub_dev, unsigned long *period, unsigned hf_cnt, unsigned long pixel_cnt)
+{
+	struct crosslink_dev *sensor = to_crosslink_dev(sub_dev);
+
+	if (sensor->video_format == FORMAT_PAL) {
+		// PAL
+		// Compare to known count ranges and determine pixel clock frequency.
+		for (u8 i = 0; i < ARRAY_SIZE(camera_pixel_counts_pal); i++) {
+			if(hf_cnt > camera_pixel_counts_pal_low[i] && hf_cnt < camera_pixel_counts_pal_high[i]) {
+				// Calculate the period in nano seconds (from femto seconds period length).
+				*period = (unsigned long)DIV_ROUND_CLOSEST_ULL((unsigned long long)pixel_cnt * camera_pixel_periods_pal[i], 1000000);
+				return 0;
+			}
+		}
+	}else if (sensor->video_format == FORMAT_NTSC) {
+		// NTSC
+		// Compare to known count ranges and determine pixel clock frequency.
+		for (u8 i = 0; i < ARRAY_SIZE(camera_pixel_counts_ntsc); i++) {
+			if(hf_cnt > camera_pixel_counts_ntsc_low[i] && hf_cnt < camera_pixel_counts_ntsc_high[i]) {
+				// Calculate the period in nano seconds (from femto seconds period length).
+				*period = (unsigned long)DIV_ROUND_CLOSEST_ULL((unsigned long long)pixel_cnt * camera_pixel_periods_ntsc[i], 1000000);
+				return 0;
+			}
+		}
+	}else {
+		dev_err(sensor->dev, "Incorrect video_format value was set: %d\n", sensor->video_format);
+		return -EINVAL;
+	}
+
+	*period = *period * 1000;
+	dev_info(sensor->dev, "Measured pixel clock count does not align with any known value: %d\nUncorrected period was taken instead.\n", hf_cnt);
+	return 0;
+}
+
+static int set_subdev_interval(struct v4l2_subdev *sub_dev, u32 *interval_numerator, u32 *interval_denominator, int *framerate) 
+{
+	struct crosslink_dev *sensor = to_crosslink_dev(sub_dev);
+
+	int ret = 0;
+	unsigned hf_cnt = 0;
+	unsigned long pixel_cnt = 0;
+	unsigned long period = 0;
+	unsigned long frame_mult = 0;
+
+	// Obtain counters that are required to adjust for the possible deviation of the internal clock inside the FPGA.
+	// HF_CNT,	counter of the internal clock based on the pixel clock. Used to determine error of the internal clock.
+	// PIX_CNT,	counter of the pixel clock per frame. Used to determine pixel clock frequency.
+	// PERIOD,	estimated period measured inside the FPGA based on the internal clock.
+	pm_runtime_get_sync(sensor->dev);
+	ret = regmap_raw_read(sensor->regmap, CROSSLINK_REG_HF_CNT, &hf_cnt, 3);
+	ret = regmap_raw_read(sensor->regmap, CROSSLINK_REG_PIX_CNT, &pixel_cnt, 3);
+	ret = regmap_raw_read(sensor->regmap, CROSSLINK_REG_FPGA_PERIOD, &period, 2);
+	pm_runtime_put_autosuspend(sensor->dev);
+	if(ret || hf_cnt==0 || pixel_cnt==0)
+		return ret;
+	else {
+		// Correct the period based on the obtained counters inside the FPGA.
+		correct_period(sub_dev, &period, hf_cnt, pixel_cnt);
+		dev_dbg(sub_dev->dev, "period: %lu\n", period);
+
+		// Multiply the period by a multiplier to not lose precision (floats can not be used).
+		frame_mult = (unsigned long)DIV_ROUND_CLOSEST_ULL((unsigned long long)1000000000 * PERIOD_MULTIPLIER, period);
+		// Rounded framerate is required for the NTSC to obtain the exact ratio.
+		*framerate = DIV_ROUND_CLOSEST(frame_mult, PERIOD_MULTIPLIER);
+
+		if (sensor->video_format == FORMAT_PAL) {
+			*interval_numerator = PERIOD_MULTIPLIER;
+			*interval_denominator = frame_mult;
+		} else if (sensor->video_format == FORMAT_NTSC) {
+			*interval_numerator = FPS_NTSC_NUMERATOR;
+			*interval_denominator = *framerate * PERIOD_MULTIPLIER;
+		} else {
+			dev_err(sensor->dev, "Incorrect video_format value was set: %d\n", sensor->video_format);
+			return -EINVAL;
+		}
+		return 0;
+	}
+}
+
 /* --------------- Subdev Operations --------------- */
 
 static int crosslink_s_power(struct v4l2_subdev *sd, int on)
@@ -69,6 +149,8 @@ static long crosslink_ioctl(struct v4l2_subdev *sd, unsigned int cmd, void *arg)
 	long ret = 0;
 	unsigned int baud;
 	u8 address = 0;
+  u32 status;
+  u32 temp_serial_len;
 	struct crosslink_dev *sensor = to_crosslink_dev(sd);
 	struct crosslink_ioctl_serial *serial;
 
@@ -78,6 +160,11 @@ static long crosslink_ioctl(struct v4l2_subdev *sd, unsigned int cmd, void *arg)
 	pm_runtime_get_sync(sensor->dev);
 	switch (cmd) {
 		case CROSSLINK_CMD_SERIAL_SEND_TX:
+      // Send reset to UART system to clear any remaining data.
+      ret  = regmap_read(sensor->regmap, CROSSLINK_REG_ENABLE, &status);
+		  ret |= regmap_write(sensor->regmap, CROSSLINK_REG_ENABLE, status &~ ENABLE_UART_MASK);
+      ret |= regmap_write(sensor->regmap, CROSSLINK_REG_ENABLE, status | ENABLE_UART_MASK);
+
 			dev_dbg_ratelimited(sensor->dev, "%s: CROSSLINK_CMD_SERIAL_TX\n", __func__);
 			serial = (struct crosslink_ioctl_serial *)arg;
 			ret = regmap_bulk_write(sensor->regmap, CROSSLINK_REG_SERIAL, serial->data, serial->len);
@@ -88,6 +175,17 @@ static long crosslink_ioctl(struct v4l2_subdev *sd, unsigned int cmd, void *arg)
 			if (serial->len == 0)
 				ret = regmap_read(sensor->regmap, CROSSLINK_REG_UART_RX_CNT, &serial->len);
 			ret = regmap_bulk_read(sensor->regmap, CROSSLINK_REG_SERIAL, serial->data, serial->len);
+			// Check if buffer overflow occured.
+      temp_serial_len = serial->len;
+      ret = regmap_read(sensor->regmap, CROSSLINK_REG_UART_FULL, &serial->len);
+      if ((serial->len & 1) == 1) {
+				dev_warn(sd->dev, "WARNING FPGA TX buffer has overflown!");
+      } 
+			if ((serial->len & 2) == 2) {
+				dev_warn(sd->dev, "WARNING FPGA RX buffer has overflown!");
+			}
+			serial->len = temp_serial_len;
+			
 			break;
 		case CROSSLINK_CMD_SERIAL_RX_CNT:
 			dev_dbg_ratelimited(sensor->dev, "%s: CROSSLINK_CMD_SERIAL_RX_WAITING\n", __func__);
@@ -120,10 +218,10 @@ static long crosslink_ioctl(struct v4l2_subdev *sd, unsigned int cmd, void *arg)
 			serial = (struct crosslink_ioctl_serial *)arg;
 			ret = regmap_read(sensor->regmap, CROSSLINK_REG_UART_STAT, &serial->len);
 			break;
-		case CROSSLINK_CMD_GET_FRAME_PERIOD:
-			dev_dbg_ratelimited(sensor->dev, "%s: CROSSLINK_CMD_GET_FRAME_PERIOD\n", __func__);
+		case CROSSLINK_CMD_GET_FPGA_PERIOD:
+			dev_dbg_ratelimited(sensor->dev, "%s: CROSSLINK_CMD_GET_FPGA_PERIOD\n", __func__);
 			serial = (struct crosslink_ioctl_serial *)arg;
-			ret = regmap_raw_read(sensor->regmap, CROSSLINK_REG_FRAME_PERIOD, &serial->len, 2);
+			ret = regmap_raw_read(sensor->regmap, CROSSLINK_REG_FPGA_PERIOD, &serial->len, 2);
 			break;
 		case CROSSLINK_CMD_GET_PIXEL_FREQ:
 			dev_dbg_ratelimited(sensor->dev, "%s: CROSSLINK_CMD_GET_PIXEL_FREQ\n", __func__);
@@ -143,6 +241,19 @@ static long crosslink_ioctl(struct v4l2_subdev *sd, unsigned int cmd, void *arg)
 		case CROSSLINK_CMD_SET_POWERDOWN:
 			dev_dbg_ratelimited(sensor->dev, "%s: CROSSLINK_CMD_SET_POWERDOWN\n", __func__);
 			sensor->enable_powerdown = 1;
+			break;
+		case CROSSLINK_CMD_SET_FORMAT_PAL:
+			dev_dbg_ratelimited(sensor->dev, "%s: CROSSLINK_CMD_SET_FORMAT_PAL\n", __func__);
+			sensor->video_format = FORMAT_PAL;
+			break;
+		case CROSSLINK_CMD_SET_FORMAT_NTSC:
+			dev_dbg_ratelimited(sensor->dev, "%s: CROSSLINK_CMD_SET_FORMAT_NTSC\n", __func__);
+			sensor->video_format = FORMAT_NTSC;
+			break;
+		case CROSSLINK_CMD_GET_VIDEOFORMAT:
+			dev_dbg_ratelimited(sensor->dev, "%s: CROSSLINK_CMD_GET_VIDEOFORMAT\n", __func__);
+			serial = (struct crosslink_ioctl_serial *)arg;
+			serial->len = sensor->video_format;
 			break;
 		case CROSSLINK_CMD_FORCE_HVSYNC_INV:
 			dev_dbg_ratelimited(sensor->dev, "%s: CROSSLINK_CMD_FORCE_HVSYNC_INV\n", __func__);
@@ -165,6 +276,29 @@ static long crosslink_ioctl(struct v4l2_subdev *sd, unsigned int cmd, void *arg)
 			dev_dbg_ratelimited(sensor->dev, "%s: CROSSLINK_CMD_SERIAL_RX_LAST\n", __func__);
 			serial = (struct crosslink_ioctl_serial *)arg;
 			ret = regmap_read(sensor->regmap, CROSSLINK_REG_UART_RX_LAST, &serial->len);
+			break;
+    case CROSSLINK_CMD_GET_UART_RX_FILLRATE:
+			dev_dbg_ratelimited(sensor->dev, "%s: CROSSLINK_CMD_GET_UART_RX_FILLRATE\n", __func__);
+			serial = (struct crosslink_ioctl_serial *)arg;
+			ret = regmap_read(sensor->regmap, CROSSLINK_REG_UART_RX_FILLRATE, &serial->len);
+			break;
+    case CROSSLINK_CMD_GET_UART_FULL:
+			dev_dbg_ratelimited(sensor->dev, "%s: CROSSLINK_CMD_GET_UART_FULL\n", __func__);
+			serial = (struct crosslink_ioctl_serial *)arg;
+			ret = regmap_read(sensor->regmap, CROSSLINK_REG_UART_FULL, &serial->len);
+		case CROSSLINK_CMD_GET_FRAME_PERIOD:
+			dev_dbg_ratelimited(sensor->dev, "%s: CROSSLINK_CMD_GET_FRAME_PERIOD\n", __func__);
+			serial = (struct crosslink_ioctl_serial *)arg;
+			unsigned hf_cnt = 0;
+			unsigned long pixel_cnt = 0;
+			unsigned long period = 0;
+			ret = regmap_raw_read(sensor->regmap, CROSSLINK_REG_HF_CNT, &hf_cnt, 3);
+			ret = regmap_raw_read(sensor->regmap, CROSSLINK_REG_PIX_CNT, &pixel_cnt, 3);
+			ret = regmap_raw_read(sensor->regmap, CROSSLINK_REG_FPGA_PERIOD, &period, 2);
+			if(ret || hf_cnt==0 || pixel_cnt==0)
+				return ret;
+			correct_period(sd, &period, hf_cnt, pixel_cnt);
+			serial->len = period;
 			break;
 		default:
 			ret = -EINVAL;
@@ -293,7 +427,7 @@ static int ops_enum_frame_interval(struct v4l2_subdev *sub_dev, struct v4l2_subd
 {
 	struct crosslink_dev *sensor = to_crosslink_dev(sub_dev);
 	int ret = -EINVAL;
-	u16 period = 0;
+	int framerate;
 
 	dev_dbg(sub_dev->dev, "%s: \n", __func__);
 
@@ -306,18 +440,8 @@ static int ops_enum_frame_interval(struct v4l2_subdev *sub_dev, struct v4l2_subd
 	}
 
 	if (fie->index == 0) {
-		pm_runtime_get_sync(sensor->dev);
-		ret  = regmap_raw_read(sensor->regmap, CROSSLINK_REG_FRAME_PERIOD, &period, 2);
-		pm_runtime_put_autosuspend(sensor->dev);
-		if(ret || period==0 || period==U16_MAX)
-			return ret;
-		else {
-			fie->interval.denominator = DIV_ROUND_CLOSEST(1000000, period);
-			dev_dbg(sub_dev->dev, "period: %d\n", period);
-			dev_dbg(sub_dev->dev, "%s, framerate: %d\n", __func__, fie->interval.denominator);
-			fie->interval.numerator = 1;
-			return 0;
-		}
+		ret =  set_subdev_interval(sub_dev, &fie->interval.numerator, &fie->interval.denominator, &framerate);
+		return ret;
 	}
 	return -EINVAL;
 }
@@ -326,29 +450,16 @@ static int ops_get_frame_interval(struct v4l2_subdev *sub_dev, struct v4l2_subde
 {
 	struct crosslink_dev *sensor = to_crosslink_dev(sub_dev);
 	int ret = 0;
-	int period=0, framerate=0;
-
+	int framerate;
 	dev_dbg(sub_dev->dev, "%s: \n", __func__);
 
 	if (fi->pad >= NUM_PADS)
 		return -EINVAL;
-	pm_runtime_get_sync(sensor->dev);
-	ret = regmap_raw_read(sensor->regmap, CROSSLINK_REG_FRAME_PERIOD, &period, 2);
-	pm_runtime_put_autosuspend(sensor->dev);
-	if(ret || period==0 || period==U16_MAX)
-		return ret;
-	else {
-		dev_dbg(sub_dev->dev, "period: %d\n", period);
-		framerate = DIV_ROUND_CLOSEST(1000000, period);
-		sensor->current_res_fr.framerate = framerate;
-		dev_dbg(sub_dev->dev, "%s, framerate: %d\n", __func__, framerate);
-		// fi->interval.numerator = period;
-		// fi->interval.denominator = 1000000;
-		fi->interval.numerator = 1;
-		fi->interval.denominator =DIV_ROUND_CLOSEST(1000000, period);
-		sensor->current_res_fr.framerate = framerate;
-		return 0;
-	}
+	
+	ret =  set_subdev_interval(sub_dev, &fi->interval.numerator, &fi->interval.denominator, &framerate);
+	sensor->current_res_fr.framerate = framerate;
+	dev_dbg(sub_dev->dev, "%s, framerate: %d\n", __func__, framerate);
+	return ret;
 }
 
 static int crosslink_enum_mbus_code(struct v4l2_subdev *sub_dev, struct v4l2_subdev_state *sd_state, struct v4l2_subdev_mbus_code_enum *code)
@@ -556,6 +667,7 @@ static int crosslink_probe(struct i2c_client *client, const struct i2c_device_id
 	sensor->i2c_client = client;
 	sensor->current_res_fr.height = 0;
 	sensor->current_res_fr.width = 0;
+	sensor->video_format = FORMAT_PAL;
 	sensor->enable_powerdown = (int)powerdown_enable;
 
 	// default init sequence initialize sensor to 1080p30 YUV422 UYVY
