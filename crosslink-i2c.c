@@ -40,7 +40,16 @@ u8 activation_msg[] = {0xA4, 0xC6, 0xF4, 0x8A};
 
 #define prog_addr 0x40
 
-static int lsc_xfer(struct i2c_client *client, u8 *write_buf, size_t write_len, u8 *read_buf, size_t read_len) {
+///	@brief Transfer data to the FPGA, with the I2C lock already in possesion.
+///	@param		client		I2C bus object.
+///	@param[in]	write_buf	Data to write.
+///	@param[in]	write_len	Number of bytes to write.
+///	@param[out]	read_buf	Buffer in which to receive the read data.
+///	@param[in]	read_len	Size of the read buffer.
+///	@returns Returns a negative value on error; success otherwise.
+///	@pre The lock for the I2C bus, passed via 'client', has been taken by
+///		the calling function.
+static int __lsc_xfer(struct i2c_client *client, u8 *write_buf, size_t write_len, u8 *read_buf, size_t read_len) {
     struct i2c_msg msg[2];
     int ret, msg_count = 1;
 
@@ -56,8 +65,39 @@ static int lsc_xfer(struct i2c_client *client, u8 *write_buf, size_t write_len, 
     msg[1].buf = read_buf;
     msg[1].len = read_len;
 
-    ret = i2c_transfer(client->adapter, msg, msg_count);
+    ret = __i2c_transfer(client->adapter, msg, msg_count);
     return ret;
+}
+
+///	@brief Transfer data to the FPGA.
+///	@param		client		I2C bus object.
+///	@param[in]	write_buf	Data to write.
+///	@param[in]	write_len	Number of bytes to write.
+///	@param[out]	read_buf	Buffer in which to receive the read data.
+///	@param[in]	read_len	Size of the read buffer.
+///	@returns Returns a negative value on error; success otherwise.
+///	@details This functions transfer data to the FPGA. The transfer is protected
+///		by the I2C bus lock, but this lock can be taken in advance to lock out
+///		other devices on the bus.
+static int lsc_xfer(struct i2c_client *client, u8 *write_buf, size_t write_len, u8 *read_buf, size_t read_len) {
+	int ret;
+	int had_lsc_lock;
+	
+	///	@li Take the bus lock with a call to 'lsc_lock()'. Remember if the bus
+	///		was already in possession.
+	had_lsc_lock = crosslink_lsc_lock(client);
+	
+	///	@li Transfer the data with a call to '__lsc_xfer()'.
+	ret = __lsc_xfer(client, write_buf, write_len, read_buf, read_len);
+
+	///	@li Release the bus lock, but only when it was taken above.
+	///		If we already had the lock when calling 'lsc_lock()', the lock is
+	///		held a global level and we must \em not release it here.
+	if( !had_lsc_lock ) {
+		crosslink_lsc_unlock(client);
+	}
+	
+	return ret;
 }
 
 static u32 lsc_status(struct i2c_client *client) {
@@ -93,7 +133,7 @@ u32 crosslink_fpga_reset(struct gpio_desc *reset, struct i2c_client *client)
 	dev_dbg(&client->dev, "DELAY 10\n");
 	gpiod_set_value_cansleep(reset, 1);
 	mdelay(5);
-	dev_dbg(&client->dev, "rESET, DELAY 1000\n");
+	dev_dbg(&client->dev, "RESET, DELAY 1000\n");
 
 	ret = lsc_xfer(client, activation_msg, ARRAY_SIZE(activation_msg), NULL, 0);
 	if (ret < 0) {
@@ -185,7 +225,7 @@ int crosslink_fpga_ops_write(struct i2c_client *client, const char *buf, size_t 
 		msglen -= maxlen;
 	}
 	dev_dbg(&client->dev, "SENDING %d PACKETS\n", msgnum);
-	ret = i2c_transfer(client->adapter, bitstream_msg, msgnum);
+	ret = __i2c_transfer(client->adapter, bitstream_msg, msgnum);
 	if (ret < 0) {
 		dev_err(&client->dev, "BITSTREAM_BURST command failed! (%d).\n", ret);
 		return ret;
@@ -218,3 +258,34 @@ int crosslink_fpga_ops_write_complete(struct i2c_client *client)
 	return 0;
 }
 
+///	@brief Take the I2C lock when accessing the FPGA.
+///	@param		client		I2C bus object.
+///	@returns Returns a boolean that indicates that the lock was already in
+///		possession.
+int crosslink_lsc_lock(struct i2c_client *client) {
+	struct crosslink_dev *sensor = crosslink_dev_from_i2c_client(client);
+	int had_i2c_lock = sensor->has_i2c_lock;
+	
+	if( !had_i2c_lock ) {
+		mutex_lock(&sensor->i2c_lock);
+		i2c_lock_bus(client->adapter, I2C_LOCK_SEGMENT);
+		sensor->has_i2c_lock = 1;
+		mutex_unlock(&sensor->i2c_lock);
+	}
+	
+	return had_i2c_lock;
+}
+
+///	@brief Release the I2C lock.
+///	@param		client		I2C bus object.
+///	@returns Always returns '0' for success.
+int crosslink_lsc_unlock(struct i2c_client *client) {
+	struct crosslink_dev *sensor = crosslink_dev_from_i2c_client(client);
+	
+	mutex_lock(&sensor->i2c_lock);
+	i2c_unlock_bus(client->adapter, I2C_LOCK_SEGMENT);
+	sensor->has_i2c_lock = 0;
+	mutex_unlock(&sensor->i2c_lock);
+	
+	return 0;
+}

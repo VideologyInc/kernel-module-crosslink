@@ -405,6 +405,7 @@ static void crosslink_fw_handler(const struct firmware *fw, void *context)
 		return;
 
 	mutex_lock(&sensor->lock);
+	crosslink_lsc_lock(sensor->i2c_client);
 	ret = crosslink_fpga_ops_write_init(sensor->reset_gpio, sensor->i2c_client);
 	if (ret < 0)
 		goto exit;
@@ -419,6 +420,7 @@ static void crosslink_fw_handler(const struct firmware *fw, void *context)
 	sensor->state = CRSLK_STATE_FW_LOADED;
 exit:
 	release_firmware(fw);
+	crosslink_lsc_unlock(sensor->i2c_client);
 	mutex_unlock(&sensor->lock);
 	regmap_write(sensor->regmap, CROSSLINK_REG_ENABLE, 0xFE);
 	if (ret < 0) {
@@ -523,6 +525,13 @@ static void crosslink_unlock_mutex(void *p) {
 	mutex_unlock(&((struct crosslink_dev *)p)->lock);
 }
 
+struct crosslink_dev *crosslink_dev_from_i2c_client(struct i2c_client *client) {
+	struct v4l2_subdev *sd = i2c_get_clientdata(client);
+	struct crosslink_dev *sensor = to_crosslink_dev(sd);
+	
+	return sensor;
+}
+
 static struct regmap_config sensor_regmap_config = {
 	.reg_bits = 8,
 	.val_bits = 8,
@@ -605,7 +614,22 @@ static int crosslink_probe(struct i2c_client *client, const struct i2c_device_id
 		return -EINVAL;
 	}
 
+	/*
+	 * We need the V4L2 device to retrieve the 'struct crosslink_dev' pointer
+	 * in 'crosslink_lsc_lock()'.
+	 */
+	v4l2_i2c_subdev_init(&sensor->sd, client, &crosslink_subdev_ops);
+
+	/*
+	 * Initialise the locks
+	 */
 	mutex_init(&sensor->lock);
+	mutex_init(&sensor->i2c_lock);
+	sensor->has_i2c_lock = 0;
+	
+	/*
+	 * Initialise access to the FPGA
+	 */
 	sensor_regmap_config.lock_arg = sensor;
 	sensor->regmap = devm_regmap_init_i2c(client, &sensor_regmap_config);
 	if (IS_ERR(sensor->regmap)) {
@@ -613,6 +637,10 @@ static int crosslink_probe(struct i2c_client *client, const struct i2c_device_id
 		return PTR_ERR(sensor->regmap);
 	}
 
+	/*
+	 * Download the firmware
+	 */
+	dev_info(dev, "Loading Firmware: %02x\n", FIRMWARE_VERSION);
 	mutex_lock(&sensor->lock);
 	idcode = crosslink_fpga_reset(sensor->reset_gpio, sensor->i2c_client);
 	if (idcode == CROSSLINK_IDCODE) {
@@ -625,15 +653,14 @@ static int crosslink_probe(struct i2c_client *client, const struct i2c_device_id
 		dev_err(dev, "unexpected IDCODE value: 0x%x\n", idcode);
 		return -EINVAL;
 	}
-
-	dev_info(dev, "Loading Firmware: %02x\n", FIRMWARE_VERSION);
 	if (ret) {
 		dev_err(dev, "Failed request_firmware_nowait err %d\n", ret);
 		goto entity_cleanup;
 	}
-
-	v4l2_i2c_subdev_init(&sensor->sd, client, &crosslink_subdev_ops);
-
+	
+	/*
+	 * Initialise the V4L2 device
+	 */
 	sensor->sd.flags |= V4L2_SUBDEV_FL_HAS_EVENTS | V4L2_SUBDEV_FL_HAS_DEVNODE;
 	sensor->sd.dev = &client->dev;
 	// sensor->sd.internal_ops = &crosslink_internal_ops;
@@ -644,7 +671,7 @@ static int crosslink_probe(struct i2c_client *client, const struct i2c_device_id
 	if (ret)
 		goto entity_cleanup;
 
-/*
+	/*
 	 * We need the driver to work in the event that pm runtime is disable in
 	 * the kernel, so power up and verify the chip now. In the event that
 	 * runtime pm is disabled this will leave the chip on, so that streaming
@@ -684,6 +711,7 @@ entity_cleanup:
 	pr_debug("---%s crosslink ERR entity_cleanup\n",__func__);
 	mutex_unlock(&sensor->lock);
 	media_entity_cleanup(&sensor->sd.entity);
+	mutex_destroy(&sensor->i2c_lock);
 	mutex_destroy(&sensor->lock);
 	return ret;
 }

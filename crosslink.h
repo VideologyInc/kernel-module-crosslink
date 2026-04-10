@@ -62,6 +62,9 @@ struct crosslink_dev {
 	int has_serial;
 	int state;
 	int firmware_loaded;
+	
+	struct mutex i2c_lock;			// Lock for the lock on the I2C bus.
+	int has_i2c_lock;				// Do we had possesion of the lock on the I2C bus?
 };
 
 enum crosslink_regs {
@@ -122,5 +125,7 @@ extern u32 crosslink_fpga_reset(struct gpio_desc *reset, struct i2c_client *clie
 extern void crosslink_tty_remove(struct crosslink_dev *sensor);
 extern int crosslink_tty_init(void);
 extern void crosslink_tty_exit(void);
-
+extern int crosslink_lsc_lock(struct i2c_client *client);
+extern int crosslink_lsc_unlock(struct i2c_client *client);
+struct crosslink_dev *crosslink_dev_from_i2c_client(struct i2c_client *client);
 #endif
