@@ -91,6 +91,7 @@ def parse_imx(data_dict):
 
     return data_dict
 
+
 # Read camera parameters from a json file.
 def read_imx(filename):
 
@@ -114,6 +115,7 @@ def read_imx(filename):
 
     return {}
 
+
 # Save parameter dict to a txt file so that vvget can read.
 def save_dict_txt(para_dict, name, aec_awb_off=True):
 
@@ -136,13 +138,14 @@ def save_dict_txt(para_dict, name, aec_awb_off=True):
         print(f"Save file error {name}. Please check write permission to the folder.")
         return False
 
+
 # Parse only interest line from vvget output message.
 def parse_vvget_output(message, keyword):
     for s in message.splitlines():
         if keyword in s:
-            return "a"+s+"\n" if s[0:2]=="ec" else s+"\n"
+            return "a" + s + "\n" if s[0:2] == "ec" else s + "\n"
     return ""
-    
+
 
 # imx900 = read_imx("imx900.json")
 # print(imx900)
