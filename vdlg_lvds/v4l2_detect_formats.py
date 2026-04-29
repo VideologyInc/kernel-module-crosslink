@@ -9,6 +9,8 @@ File:   v4l2_detect_formats.py
 2026.0302.  Added Zoom Block camera format full list (resolution, fps, formats) from Visca commands.
 2026.0227.  Detect formats by parsing from v4l2 command v4l2-ctl -d /dev/video0 --list-formats-ext outputs.
 
+2026.0428.  Added functions to generate camera settings list compatible with Portal exclude all nnstreamer strings.
+
 By:			jye@videologyinc.com
 
 """
@@ -65,6 +67,7 @@ Object_Detection_List = [
 ]
 """ List of resolution and format to add thermal and object detection pipelines. """
 
+
 # Calculate stepwise closest value <=max if input > max.
 def closest_value(val, istep, max_val):
     if val <= max_val:
@@ -72,9 +75,9 @@ def closest_value(val, istep, max_val):
 
     istep = max(istep, 1)
     # val > max_val => diff = val - max; ns = diff//istep; ret = val - ns*step
-    ret = val - (val - max_val)//istep *istep
+    ret = val - (val - max_val) // istep * istep
 
-    return ret if ret<=max_val else ret - istep
+    return ret if ret <= max_val else ret - istep
 
 
 def parse_v4l2_formats(device="/dev/video0"):
@@ -106,7 +109,9 @@ def parse_v4l2_formats(device="/dev/video0"):
     fps_pattern = re.compile(r"Interval:\s+Discrete\s+.*?\s+\(([\d\.]+)\s+fps\)")
 
     # For global shutter cameras etc.
-    stepwise_pattern = re.compile(r"Size: Stepwise (\d+)x(\d+) - (\d+)x(\d+) with step (\d+)/(\d+)")
+    stepwise_pattern = re.compile(
+        r"Size: Stepwise (\d+)x(\d+) - (\d+)x(\d+) with step (\d+)/(\d+)"
+    )
 
     for line in output.splitlines():
         line = line.strip()
@@ -132,21 +137,29 @@ def parse_v4l2_formats(device="/dev/video0"):
             }
             current_format["sizes"].append(current_size)
             continue
-        
+
         # Parse Stepwise Sizes (minx, miny, maxx, maxy, stepx, stepy)
         if "Size: Stepwise" in line and current_format is not None:
             stepwise_match = stepwise_pattern.search(line)
             if stepwise_match:
                 # res = f"Stepwise: {match.group(1)}x{match.group(2)} to {match.group(3)}x{match.group(4)}, Step: {match.group(5)}x{match.group(6)}"
                 # Only use maximum resolution for now.
-                w = closest_value(int(stepwise_match.group(3)), int(stepwise_match.group(5)), MAX_WIDTH)
-                h = closest_value(int(stepwise_match.group(4)), int(stepwise_match.group(6)), MAX_HEIGHT)
+                w = closest_value(
+                    int(stepwise_match.group(3)),
+                    int(stepwise_match.group(5)),
+                    MAX_WIDTH,
+                )
+                h = closest_value(
+                    int(stepwise_match.group(4)),
+                    int(stepwise_match.group(6)),
+                    MAX_HEIGHT,
+                )
                 current_size = {
                     "width": w,
                     "height": h,
                     "fps": [],
                 }
-                current_format['sizes'].append(current_size)
+                current_format["sizes"].append(current_size)
 
         # Match FPS line
         fps_match = fps_pattern.search(line)
@@ -518,23 +531,23 @@ def v4l2_format_to_gst(
         # Make sure we have these keys in dict.
         if ("width" not in sz) or ("height" not in sz):
             continue
-        if ("fps" not in sz):
+        if "fps" not in sz:
             continue
 
         w = sz["width"]
         h = sz["height"]
-        if (w==0 or h==0):
+        if w == 0 or h == 0:
             continue
 
         # print(sz)
 
         # No fps field. Set to 60.
-        fps = 60 if (sz["fps"]==[]) else int(math.ceil(sz["fps"][0]))
+        fps = 60 if (sz["fps"] == []) else int(math.ceil(sz["fps"][0]))
         f = format_dict["pixelformat"]
         f_gst = fourcc_to_gst(f)
 
         # Skip some slow formats of global shutter camera.
-        if camera_type=="ar0234" and f_gst in Formats_Exclude_AR0234:
+        if camera_type == "ar0234" and f_gst in Formats_Exclude_AR0234:
             continue
 
         if camera_type == "boson" and f_gst == "GRAY16_LE":
@@ -621,6 +634,57 @@ def camera_to_gst_list(device):
     return info_list
 
 
+# Given camera device path, return its supported list of settings compatible with Portal.
+def camera_to_setting_list(device):
+    camera_type, cam_path = detect_camera_type(device)
+    # print(camera_type)
+
+    camera_formats = formats_filter_out_unwanted(parse_v4l2_formats(device))
+
+    if camera_type == "zoomblock":
+        # Add full resolution and framerate support for ZoomBlock (from visca commands)
+        print("Create new format list for ZoomBlock cameras.")
+        camera_formats = add_formats_lvds(camera_formats)
+
+    # Skip all info using nnstreamer now for camera input settings.
+    setting_list = []
+    for fd in camera_formats:
+        for sz in fd["sizes"]:
+            # Make sure we have these keys in dict.
+            if ("width" not in sz) or ("height" not in sz):
+                continue
+            if "fps" not in sz:
+                continue
+
+            w = sz["width"]
+            h = sz["height"]
+            if w == 0 or h == 0:
+                continue
+
+            # print(sz)
+
+            # No fps field. Set to 60.
+            fps = 60 if (sz["fps"] == []) else int(math.ceil(sz["fps"][0]))
+            f = fd["pixelformat"]
+            f_gst = fourcc_to_gst(f)
+
+            # Skip some slow formats of global shutter camera.
+            if camera_type == "ar0234" and f_gst in Formats_Exclude_AR0234:
+                continue
+
+            # Regular gst string.
+            # s = f"video/x-raw,width={w},height={h},framerate={fps}/1,format={f_gst} ! videoconvert"
+            # t = (w, h, f"fps={fps},format={f_gst}", s, fps)
+            one = {}
+            one["format"] = f_gst
+            one["fps"] = fps
+            one["resolution"] = f"{w}x{h}"
+            one["device"] = device
+            setting_list.append(one)
+
+    return setting_list
+
+
 # Example Usage
 if __name__ == "__main__":
     """
@@ -638,9 +702,20 @@ if __name__ == "__main__":
         "-d", "--device", type=str, default="/dev/video0", help="camera device path"
     )
 
+    # Default is False.
+    parser.add_argument("-s", "--settings", action="store_true", help="generate and show camera settings only. Default = False.")
+
     args = parser.parse_args()
 
-    info_list = camera_to_gst_list(args.device)
+    if args.settings:
+        # Get and show camera settings compatible with Portal.
+        settings_list = camera_to_setting_list(args.device)
 
-    for info in info_list:
-        print(info)
+        for one_setting in settings_list:
+            print(one_setting)
+    else:
+        # Get go2RTC version of camera formats list containing gstreamer strings.
+        info_list = camera_to_gst_list(args.device)
+
+        for info in info_list:
+            print(info)
