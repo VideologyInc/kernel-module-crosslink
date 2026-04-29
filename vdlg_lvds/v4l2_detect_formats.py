@@ -703,7 +703,12 @@ if __name__ == "__main__":
     )
 
     # Default is False.
-    parser.add_argument("-s", "--settings", action="store_true", help="generate and show camera settings only. Default = False.")
+    parser.add_argument(
+        "-s",
+        "--settings",
+        action="store_true",
+        help="generate and show camera settings only. Default = False.",
+    )
 
     args = parser.parse_args()
 

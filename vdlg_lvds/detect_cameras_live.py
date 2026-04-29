@@ -29,6 +29,9 @@ import cv2
 MAX_CAMERA_ID = 10
 """ Maximum camera index with /dev/video* to detect. """
 
+# camera_dict and camera_gst_dict are default values use by all py
+# if /etc/default/camera_dict.json or /etc/default/camera_gst_dict.json does not exist.
+
 # Camera key words in device tree and its regular names
 # Currently supports 4 camera types:
 # global shutter = AR0234   => ar0234
@@ -45,6 +48,127 @@ camera_dict = {
     "usb": "usb",
 }
 """ Camera key words in device tree and its regular names. """
+
+# Camera gst dict (high resolution, low resolution and format multiple settings tuples with 4 items each)
+camera_gst_dict = {
+    "ar0234": [
+        (
+            1920,
+            1080,
+            "default",
+            "video/x-raw,width=1920,height=1080,framerate=60/1",
+            60,
+        ),
+        (1280, 720, "default", "video/x-raw,width=1280,height=720,framerate=60/1", 60),
+    ],
+    "zoomblock": [
+        (
+            1920,
+            1080,
+            "default",
+            "video/x-raw,width=1920,height=1080,framerate=25/1",
+            25,
+        ),
+        (1280, 720, "default", "video/x-raw,width=1280,height=720,framerate=25/1", 25),
+    ],
+    "boson": [
+        (640, 512, "default", "video/x-raw,width=640,height=512,framerate=60/1", 60),
+        (320, 256, "default", "video/x-raw,width=320,height=256,framerate=60/1", 60),
+        (
+            640,
+            512,
+            "GRAY8",
+            "video/x-raw,width=640,height=512,framerate=60/1,format=GRAY8 ! videoconvert ! video/x-raw,format=NV12",
+            60,
+        ),
+        (
+            320,
+            256,
+            "GRAY8",
+            "video/x-raw,width=320,height=256,framerate=60/1,format=GRAY8 ! videoconvert ! video/x-raw,format=NV12",
+            60,
+        ),
+    ],
+    # imx sensors use their *.xml from framos-vvcam-module repository
+    "imx900": [
+        (
+            1920,
+            1080,
+            "default",
+            "video/x-raw,width=1920,height=1080,framerate=15/1,format=YUY2",
+            15,
+        ),
+        (
+            1280,
+            720,
+            "default",
+            "video/x-raw,width=1280,height=720,framerate=15/1,format=YUY2",
+            15,
+        ),
+        # Not supported by vpuenc_h264:
+        # (2048, 1536, "default", "video/x-raw,width=2048,height=1536,framerate=15/1,format=YUY2", 15),
+        (
+            1024,
+            768,
+            "default",
+            "video/x-raw,width=1024,height=768,framerate=15/1,format=YUY2",
+            15,
+        ),
+        (
+            1008,
+            704,
+            "default",
+            "video/x-raw,width=1008,height=704,framerate=15/1,format=YUY2",
+            15,
+        ),
+    ],
+    "imx678": [
+        (
+            1920,
+            1080,
+            "default",
+            "video/x-raw,width=1920,height=1080,framerate=30/1,format=NV12",
+            30,
+        ),
+        (
+            1280,
+            720,
+            "default",
+            "video/x-raw,width=1280,height=720,framerate=30/1,format=NV12",
+            30,
+        ),
+    ],
+    "imx662": [
+        (
+            1920,
+            1080,
+            "default",
+            "video/x-raw,width=1920,height=1080,framerate=60/1,format=YUY2",
+            60,
+        ),
+        (
+            1280,
+            720,
+            "default",
+            "video/x-raw,width=1280,height=720,framerate=60/1,format=YUY2",
+            60,
+        ),
+        (
+            960,
+            540,
+            "default",
+            "video/x-raw,width=960,height=540,framerate=60/1,format=YUY2",
+            60,
+        ),
+        (
+            640,
+            480,
+            "default",
+            "video/x-raw,width=640,height=480,framerate=60/1,format=YUY2",
+            60,
+        ),
+    ],
+}
 
 
 # Check camera on/off using OpenCV VideoCapture().

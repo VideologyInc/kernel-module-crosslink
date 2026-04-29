@@ -20,7 +20,14 @@ import sys
 import time
 
 from vdlg_lvds.detect_cameras_live import detect_camera_type
-from vdlg_lvds.read_imx_json import read_imx, default_imx, AEC_LIST, AWB_LIST, parse_vvget_output, save_dict_txt
+from vdlg_lvds.read_imx_json import (
+    read_imx,
+    default_imx,
+    AEC_LIST,
+    AWB_LIST,
+    parse_vvget_output,
+    save_dict_txt,
+)
 
 
 # Given jc parsed lsof output list of dict, check command containing isp_media (imx is available) or gst-launc (imx stream on).
@@ -70,6 +77,7 @@ def restart_go2rtc():
     except Exception as e:
         print(f"Restart go2rtc failed: {e}")
 
+
 # Turn off
 def vvget_off(camera_id, feature_name):
     # 1. Turn off
@@ -81,6 +89,7 @@ def vvget_off(camera_id, feature_name):
         text=True,
         check=True,
     )
+
 
 # Reset
 def vvget_reset(camera_id, feature_name):
@@ -94,11 +103,12 @@ def vvget_reset(camera_id, feature_name):
         check=True,
     )
 
+
 # Turn AEC or AWB off, and reset.
 def vvget_set_feature_off(camera_id, feature_name):
     # AEC or AWB correct values must follow steps: off, reset, set values; or reset, off, set values.
     # AEC OFF => AEC Reset
-    if feature_name=="AEC":
+    if feature_name == "AEC":
         # Keep trying to turn AEC off until get 0 ;-)
         while True:
             cmd2 = f"vvget {camera_id} '{feature_name} On/Off'"
@@ -109,12 +119,12 @@ def vvget_set_feature_off(camera_id, feature_name):
                 text=True,
                 check=True,
             )
-            valstr = parse_vvget_output(result2.stdout, feature_name+":")
+            valstr = parse_vvget_output(result2.stdout, feature_name + ":")
             if "0" in valstr:
                 break
             vvget_off(camera_id, feature_name)
     else:
-    # AWB Reset => AWB OFF
+        # AWB Reset => AWB OFF
         vvget_off(camera_id, feature_name)
         vvget_reset(camera_id, feature_name)
         vvget_off(camera_id, feature_name)
@@ -128,7 +138,7 @@ def vvget_set_feature_off(camera_id, feature_name):
             text=True,
             check=True,
         )
-    return parse_vvget_output(result2.stdout, feature_name+":")
+    return parse_vvget_output(result2.stdout, feature_name + ":")
 
 
 # Set values by para dict.
@@ -304,10 +314,5 @@ if __name__ == "__main__":
     print(f"Initial camera status: camera {camera_status}, stream {stream_status}")
 
     monitor_cameras_loop(
-        args.device,
-        camera_status,
-        stream_status,
-        args.interval,
-        txt_name,
-        args.aec
+        args.device, camera_status, stream_status, args.interval, txt_name, args.aec
     )
