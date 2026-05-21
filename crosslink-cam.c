@@ -546,7 +546,8 @@ static int crosslink_probe(struct i2c_client *client, const struct i2c_device_id
 	int ret;
 	u32 idcode = 0;
 
-	pr_debug("-->%s crosslink Probe start\n",__func__);
+	pr_info("AB#2313. -->%s crosslink Probe starts\n",__func__);
+	// pr_debug("-->%s crosslink Probe start\n",__func__);
 
 	sensor = devm_kzalloc(dev, sizeof(*sensor), GFP_KERNEL);
 	if (!sensor)
@@ -626,6 +627,8 @@ static int crosslink_probe(struct i2c_client *client, const struct i2c_device_id
 		return -EINVAL;
 	}
 
+	pr_info("-->AB#2313. Firmware B7 bit loaded: %02x\n", FIRMWARE_VERSION);
+
 	dev_info(dev, "Loading Firmware: %02x\n", FIRMWARE_VERSION);
 	if (ret) {
 		dev_err(dev, "Failed request_firmware_nowait err %d\n", ret);
@@ -643,6 +646,8 @@ static int crosslink_probe(struct i2c_client *client, const struct i2c_device_id
 	ret = media_entity_pads_init(&sensor->sd.entity, 1, &sensor->pad);
 	if (ret)
 		goto entity_cleanup;
+
+	pr_info("-->AB#2313. subdev init and media pad init done. \n");
 
 /*
 	 * We need the driver to work in the event that pm runtime is disable in
@@ -665,6 +670,8 @@ static int crosslink_probe(struct i2c_client *client, const struct i2c_device_id
 			ret);
 		goto err_pm_runtime;
 	}
+	pr_info("-->AB#2313. v4l2 subdev registered.\n");
+
 
 	pm_runtime_set_autosuspend_delay(&client->dev, powerdown_timeout_ms);
 	pm_runtime_use_autosuspend(&client->dev);
@@ -672,7 +679,9 @@ static int crosslink_probe(struct i2c_client *client, const struct i2c_device_id
 
 	// ret = crosslink_tty_probe(sensor);
 	mutex_unlock(&sensor->lock);
-	pr_debug("<--%s crosslink Probe end successful, return\n",__func__);
+
+	pr_info("<--AB#2313. %s crosslink Probe end successful, return\n",__func__);
+
 	sensor->state = CRSLK_STATE_PROBED;
 	return 0;
 
