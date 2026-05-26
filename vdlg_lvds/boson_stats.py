@@ -7,6 +7,7 @@ And calculate PNSR among them to detect which ones are closer and which ones are
 Copyright (C) 2026 Videology
 Programmed by Jianping Ye <jye@videologyinc.com>
 
+May 22, 2026. Fixed a bug of bosn camera open exception if it is busy. Now return default values instead.  
 Mar 26, 2026. Added calculate stats and linear transfrom function to be called by go2rtc.
 Mar 23, 2026. Added percentile estimates to avoid 0 and linear transform formula outputs for 8bit and 16bit so that nnstreamer can use them.
 Feb 12, 2026. Added 16bit to 8bit to 16bit conversion and PSNR calculation for raw, scaled, and normalized images.
@@ -250,7 +251,8 @@ def boson_show_telemetry(
 
     cap = cv2.VideoCapture(camera_number, cv2.CAP_V4L2)
     if not cap.isOpened():
-        raise SystemExit("Failed to open camera")
+        # Camera is probably busy. Just return default values.
+        return beta, alpha16, alpha8
 
     try:
         cap.set(cv2.CAP_PROP_FRAME_WIDTH, width)
