@@ -286,6 +286,7 @@ static long crosslink_ioctl(struct v4l2_subdev *sd, unsigned int cmd, void *arg)
 			dev_dbg_ratelimited(sensor->dev, "%s: CROSSLINK_CMD_GET_UART_FULL\n", __func__);
 			serial = (struct crosslink_ioctl_serial *)arg;
 			ret = regmap_read(sensor->regmap, CROSSLINK_REG_UART_FULL, &serial->len);
+      break;
 		case CROSSLINK_CMD_GET_FRAME_PERIOD:
 			dev_dbg_ratelimited(sensor->dev, "%s: CROSSLINK_CMD_GET_FRAME_PERIOD\n", __func__);
 			serial = (struct crosslink_ioctl_serial *)arg;
