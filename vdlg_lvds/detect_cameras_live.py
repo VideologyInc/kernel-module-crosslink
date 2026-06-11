@@ -6,6 +6,7 @@ File:   detect_cameras_live.py
 
 2026.0306.  Detect camera live connection using device tree and camera path.
 2026.0603.  Added usb camera live detection using package linuxpy.
+2026.0611.  Updated camera live detection to only on usb cameras to avoid annoying warning messages.
 
 By:			jye@videologyinc.com
 
@@ -316,7 +317,8 @@ def detect_cameras():
             camera_controls = get_camera_controls(camera_path)
             if camera_controls == {}:
                 continue
-        if camera_name != "":
+        # Now only check usb camera status.
+        if camera_name == "usb":
             # Check camera on/off using OpenCV.
             is_on = check_camera(camera_path)
             camera_status[camera_path] = (camera_name, devicetree_name, is_on)
@@ -403,7 +405,7 @@ if __name__ == "__main__":
     ensure_single_instance_socket()
 
     parser = argparse.ArgumentParser(
-        description="Detect cameras live",
+        description="Detect Usb Cameras Live, version 1.0.0",
         prog="detect_cameras_live",
     )
     parser.add_argument(
@@ -411,7 +413,7 @@ if __name__ == "__main__":
         "--interval",
         type=int,
         default="5",
-        help="Interval in seconds to check cameras",
+        help="Interval in seconds to check usb cameras. Default is 5 seconds",
     )
 
     args = parser.parse_args()
