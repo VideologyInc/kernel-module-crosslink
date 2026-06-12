@@ -24,6 +24,7 @@ import json
 
 from vdlg_lvds.detect_cameras_live import detect_camera_type, camera_dict
 from vdlg_lvds.boson_stats import boson_show_telemetry as boson_calculate_linear
+from vdlg_lvds.zoomblock_settings import get_formats_lvds
 
 # Maximum resolution Scailx decoder h264 supports.
 MAX_WIDTH = 1920
@@ -611,8 +612,9 @@ def camera_to_gst_list(device):
 
     if camera_type == "zoomblock":
         # Add full resolution and framerate support for ZoomBlock (from visca commands)
-        print("Create new format list for ZoomBlock cameras.")
-        camera_formats = add_formats_lvds(camera_formats)
+        # print("Create new format list for ZoomBlock cameras.")
+        print("Get current settings of zoomblock cameras.")
+        camera_formats = get_formats_lvds() # add_formats_lvds(camera_formats)
 
     # print(json.dumps(camera_formats, indent=2))
 
@@ -643,8 +645,9 @@ def camera_to_setting_list(device):
 
     if camera_type == "zoomblock":
         # Add full resolution and framerate support for ZoomBlock (from visca commands)
-        print("Create new format list for ZoomBlock cameras.")
-        camera_formats = add_formats_lvds(camera_formats)
+        # print("Create new format list for ZoomBlock cameras.")
+        print("Get current settings of zoomblock cameras.")
+        camera_formats = get_formats_lvds() # add_formats_lvds(camera_formats)
 
     # Skip all info using nnstreamer now for camera input settings.
     setting_list = []

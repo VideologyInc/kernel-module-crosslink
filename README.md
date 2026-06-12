@@ -36,6 +36,8 @@ Note: this module is valid only for Linux kernels > 5.12
 
 Updates on python3 module ~/vdlg_lvds - Scailx Yocto bitbake module = python3-lvds2mipi.
 
+2026.0612.	Added ZoomBlock live settings to go2rtc and Portal.
+
 2026.0611.	Updated live usb camera detection py to skip other cameras.
 
 2026.0603.	Added live usb camera On/Off detection py.
