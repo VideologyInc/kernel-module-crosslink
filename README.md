@@ -25,8 +25,11 @@ Note: this module is valid only for Linux kernels > 5.12
 
 #### 4. Check module is loaded `lsmod`.
 
-#### 5. Check newly built module is in correct place.
+#### 5a. Check newly built module is in correct place.
 ####	'ls -lt /lib/modules/6*/updates*/lvds2mipi.ko`
+
+#### 5b. Do not forget to copy camera bit image file to /lib/firmware/
+####	'cp *.bit /lib/firmware/'
 
 #### 6.	Reboot Scailx and run `dmesg` to see new messages we added to the device driver C codes modprobe() function.
 
@@ -35,6 +38,8 @@ Note: this module is valid only for Linux kernels > 5.12
 ============================================================================
 
 Updates on python3 module ~/vdlg_lvds - Scailx Yocto bitbake module = python3-lvds2mipi.
+
+2026.0625.	Rebased B8 develop branch to master as this branch. B8 driver is working now together with python package vdlg_lvds update.
 
 2026.0612.	Added ZoomBlock live settings to go2rtc and Portal.
 

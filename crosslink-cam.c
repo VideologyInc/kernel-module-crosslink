@@ -667,6 +667,8 @@ static int crosslink_probe(struct i2c_client *client, const struct i2c_device_id
 	int ret;
 	u32 idcode = 0;
 
+	pr_info("******** AB2418 lvds crosslink Probe start *********\n");
+
 	pr_debug("-->%s crosslink Probe start\n",__func__);
 
 	sensor = devm_kzalloc(dev, sizeof(*sensor), GFP_KERNEL);
