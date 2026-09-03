@@ -17,10 +17,12 @@ import argparse
 import glob
 import json
 import math
+from pathlib import Path
 
 from vdlg_lvds.serial import LvdsSerial
 from vdlg_lvds.get_res import get_resolution
 from vdlg_lvds.set_res import detect_camera_brand, set_resolution
+from vdlg_lvds.get_camera_v4l2_paras import get_v4l2_subdev
 
 from vdlg_lvds.detect_cameras_live import detect_camera_type, restart_go2rtc
 
@@ -56,13 +58,42 @@ def get_res_string_to_v4l2_struct(str_with_at):
 
     return [one, two]
 
-# Connection to detect_formats functions
-def get_formats_lvds():
-    lvds_device, current = zoomblock_get_resolution()
+# Given device = "/dev/video0", run media-ctl to find its csi path => subdev path for getres / setres to run properly.
+def device_to_subdev(device):
+    # Get subdev list of crosslink
+    subdev_list = get_v4l2_subdev()
+    # device to subdev to get res and set res. They CANNOT use /dev/video0 ect. directly ;-)
+    for (cross, isi, subdev) in subdev_list:
+        cam_real_path = str(Path(isi).resolve())
+        if cam_real_path == device:
+            return subdev
 
-    if current !="":
+    # Cannot find using media-ctl, use default lvds path or v4l-subdev path.
+    lvds_devs = glob.glob("/dev/links/lvds*")
+    default_lvds = lvds_devs[0] if lvds_devs else "/dev/v4l-subdev1"
+    return default_lvds
+
+
+# Given device = "/dev/video0", etc. connection to detect_formats functions.
+def get_formats_lvds(device):
+
+    subdev = device_to_subdev(device)
+
+    lvds_device, current = zoomblock_get_resolution(subdev)
+
+    if current !="" and (not current.startswith("0")):
         return get_res_string_to_v4l2_struct(current)
     else:
+        # Try to set resolution from the dict until successful
+        for res, val in zoomblock_settings_dict.items():
+            zoomblock_set_resolution(lvds_device, res)
+            dev, current = zoomblock_get_resolution(subdev)
+
+            print(current)
+
+            if current !="" and (not current.startswith("0")):
+                return get_res_string_to_v4l2_struct(current)
+
         return []
     
 
@@ -72,23 +103,23 @@ def show_zoomblock_settings():
 
 
 # Check whether there is lvds in /dev/links and get current resolution.
-def zoomblock_get_resolution():
-    lvds_devs = glob.glob("/dev/links/lvds*")
-    default_lvds = lvds_devs[0] if lvds_devs else "/dev/v4l-subdev1"
+def zoomblock_get_resolution(subdev):
+    # lvds_devs = glob.glob("/dev/links/lvds*")
+    # default_lvds = lvds_devs[0] if lvds_devs else "/dev/v4l-subdev1"
 
     f = io.StringIO()
     with redirect_stdout(f):
-        get_resolution(default_lvds)
+        get_resolution(subdev)
     output_string = f.getvalue()
-    return default_lvds, output_string
+    return subdev, output_string
 
 # Given camera device path and resolution str, set it calling set_resolution function.
-def zoomblock_set_resolution(device, resolution):
+def zoomblock_set_resolution(subdev, resolution):
 
     try:
         f = io.StringIO()
         with redirect_stdout(f):
-            serial_device = LvdsSerial(device)
+            serial_device = LvdsSerial(subdev)
             brand = detect_camera_brand(serial_device)
             set_resolution(serial_device, resolution, brand)
     except:
@@ -96,7 +127,7 @@ def zoomblock_set_resolution(device, resolution):
         return "", ""
 
     # check and return real current resolution
-    return zoomblock_get_resolution()
+    return zoomblock_get_resolution(subdev)
 
 
 # Example Usage
@@ -125,6 +156,10 @@ if __name__ == "__main__":
     )
 
     parser.add_argument(
+        "-f", "--first", type=int, default=0, help="Show current format and set / get valid formats until successful."
+    )
+
+    parser.add_argument(
         "-s", "--show", type=int, default=0, help="Show available setting list to set. Default = 0."
     )
 
@@ -149,7 +184,12 @@ if __name__ == "__main__":
     if args.show:
         show_zoomblock_settings()
 
-    lvds_device, current = zoomblock_get_resolution()
+    subdev = device_to_subdev(args.device)
+
+    if args.first:
+        get_formats_lvds(args.device)
+
+    lvds_device, current = zoomblock_get_resolution(subdev)
     print("Current resolution and framerate is:", current)
 
     if args.resolution != "":

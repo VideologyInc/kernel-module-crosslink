@@ -39,6 +39,8 @@ Note: this module is valid only for Linux kernels > 5.12
 
 Updates on python3 module ~/vdlg_lvds - Scailx Yocto bitbake module = python3-lvds2mipi.
 
+2026.0903.	Fixed ZoomBlock formats py for go2RTC to set/get valid formats and dual-ZoomBlock settings.
+
 2026.0625.	Rebased B8 develop branch to master as this branch. B8 driver is working now together with python package vdlg_lvds update.
 
 2026.0612.	Added ZoomBlock live settings to go2rtc and Portal.

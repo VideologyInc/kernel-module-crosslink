@@ -614,7 +614,7 @@ def camera_to_gst_list(device):
         # Add full resolution and framerate support for ZoomBlock (from visca commands)
         # print("Create new format list for ZoomBlock cameras.")
         print("Get current settings of zoomblock cameras.")
-        camera_formats = get_formats_lvds() # add_formats_lvds(camera_formats)
+        camera_formats = get_formats_lvds(device) # add_formats_lvds(camera_formats)
 
     # print(json.dumps(camera_formats, indent=2))
 
@@ -647,7 +647,7 @@ def camera_to_setting_list(device):
         # Add full resolution and framerate support for ZoomBlock (from visca commands)
         # print("Create new format list for ZoomBlock cameras.")
         print("Get current settings of zoomblock cameras.")
-        camera_formats = get_formats_lvds() # add_formats_lvds(camera_formats)
+        camera_formats = get_formats_lvds(device) # add_formats_lvds(camera_formats)
 
     # Skip all info using nnstreamer now for camera input settings.
     setting_list = []
