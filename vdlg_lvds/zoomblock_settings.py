@@ -73,6 +73,20 @@ def device_to_subdev(device):
     default_lvds = lvds_devs[0] if lvds_devs else "/dev/v4l-subdev1"
     return default_lvds
 
+# Given get res string 1280 x 720 @ 25.0, check its values are valid
+def is_res_valid(str_with_at):
+    res_list = str_with_at.split()
+    # [0] = w, [2] = h, [4] = fps
+    width = int(res_list[0])
+    height = int(res_list[2])
+    fps = math.ceil(float(res_list[4]))
+
+    if width==1920 and height==1080:
+        return True
+    elif width==1280 and height==720:
+        return True
+    else:
+        return False
 
 # Given device = "/dev/video0", etc. connection to detect_formats functions.
 def get_formats_lvds(device):
@@ -80,8 +94,9 @@ def get_formats_lvds(device):
     subdev = device_to_subdev(device)
 
     lvds_device, current = zoomblock_get_resolution(subdev)
+    # print(current)
 
-    if current !="" and (not current.startswith("0")):
+    if current !="" and is_res_valid(current):
         return get_res_string_to_v4l2_struct(current)
     else:
         # Try to set resolution from the dict until successful
@@ -89,9 +104,9 @@ def get_formats_lvds(device):
             zoomblock_set_resolution(lvds_device, res)
             dev, current = zoomblock_get_resolution(subdev)
 
-            print(current)
+            # print(current)
 
-            if current !="" and (not current.startswith("0")):
+            if current !="" and is_res_valid(current):
                 return get_res_string_to_v4l2_struct(current)
 
         return []
@@ -187,7 +202,10 @@ if __name__ == "__main__":
     subdev = device_to_subdev(args.device)
 
     if args.first:
-        get_formats_lvds(args.device)
+        res = get_formats_lvds(args.device)
+        print(res)
+        if len(res) == 0:
+            exit
 
     lvds_device, current = zoomblock_get_resolution(subdev)
     print("Current resolution and framerate is:", current)
